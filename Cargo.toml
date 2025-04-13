@@ -5,7 +5,10 @@ version = "0.1.0"
 
 [[bin]]
 name = "dual-core"
-path = "./src/bin/main.rs"
+path = "./src/main.rs"
+test = false
+doctest = false
+bench = false
 
 [dependencies]
 embassy-net = { version = "0.6.0", features = [
@@ -13,11 +16,15 @@ embassy-net = { version = "0.6.0", features = [
   "medium-ethernet",
   "tcp",
   "udp",
+  "dns",
+  "medium-ethernet",
+  "proto-ipv4",
 ] }
 embedded-io = "0.6.1"
 embedded-io-async = "0.6.1"
 esp-alloc = "0.7.0"
 esp-hal = { version = "1.0.0-beta.0", features = ["esp32s3", "unstable"] }
+cfg-if              = "1.0.0"
 smoltcp = { version = "0.12.0", default-features = false, features = [
   "medium-ethernet",
   "multicast",
@@ -36,9 +43,10 @@ bleps = { git = "https://github.com/bjoernQ/bleps", package = "bleps", rev = "a5
   "macros",
 ] }
 critical-section = "1.2.0"
-embassy-executor = { version = "0.7.0", features = ["task-arena-size-20480"] }
+embassy-executor = { version = "0.7.0", features = ["task-arena-size-98304"] }
 embassy-time = { version = "0.4.0", features = ["generic-queue-8"] }
 esp-hal-embassy = { version = "0.7.0", features = ["esp32s3"] }
+embassy-sync = "0.6.2"
 esp-wifi = { version = "0.13.0", features = [
   "ble",
   "builtin-scheduler",
@@ -50,7 +58,13 @@ esp-wifi = { version = "0.13.0", features = [
 ] }
 heapless = { version = "0.8.0", default-features = false }
 static_cell = { version = "2.1.0", features = ["nightly"] }
-esp-println = {version = "0.13.1", features = ["esp32s3"]}
+esp-println = {version = "0.13.1", features = ["esp32s3", "log"]}
+esp-backtrace = {version = "0.15.1", features = ["esp32s3", "exception-handler", "panic-handler", "println"]}
+
+# HTTP
+reqwless = { version = "0.13", default-features = false, features = ["alloc", "embedded-tls", "log"] }
+
+rand_core = { version = "0.9.3", default-features = true }
 
 [profile.dev]
 # Rust debug is too slow.
@@ -65,3 +79,5 @@ incremental      = false
 lto              = 'fat'
 opt-level        = 's'
 overflow-checks  = false
+
+
