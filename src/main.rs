@@ -6,6 +6,7 @@
 #![no_std]
 #![no_main]
 #![feature(type_alias_impl_trait)]
+#![feature(adt_const_params)]
 extern crate alloc;
 
 use core::ptr::addr_of_mut;
@@ -17,12 +18,15 @@ use embassy_time::{Duration, Timer};
 #[allow(unused_imports)]
 use esp_backtrace as _;
 use esp_hal::{
-    clock::CpuClock, gpio::{Level, Output, OutputConfig}, system::{CpuControl, Stack}, timer::{timg::TimerGroup, AnyTimer}
+    clock::CpuClock, system::{CpuControl, Stack}, timer::{timg::TimerGroup, AnyTimer}
 };
 use esp_hal::rng::Rng;
+use esp_hal::{rmt::Rmt, time::Rate};
 use esp_hal_embassy::Executor;
 use esp_println::println;
 use static_cell::StaticCell;
+
+mod neopixel;
 
 mod second_core;
 mod main_core;
@@ -81,9 +85,7 @@ async fn main(spawner: Spawner) {
 
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
-
-    let led = Output::new(peripherals.GPIO0, Level::Low, OutputConfig::default());
-
+    
     let stack = connect_to_wifi(spawner, timer_g0, rng, peripherals.WIFI, peripherals.RADIO_CLK, SSID,  PASSWORD).await.unwrap();
     println!(">>>>>>>>>>> System Init finished <<<<<<<<<<<<<<<<<<<<<,");
     
@@ -95,8 +97,11 @@ async fn main(spawner: Spawner) {
     let tcp_client2 = TCP_CLIENT2.init(TcpClient::new(*stack, client_state2));
     let http_client2 = EmbassyHttpClient::new(stack, tcp_client2);
 
+    
     println!(">>>>>>>>>>> Init finished <<<<<<<<<<<<<<<<<<<<<<<<<<<<,");
-
+    let led_pin = peripherals.GPIO48;
+    let freq = Rate::from_mhz(80);
+    let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
 
     println!(">>>> Starting http worker 1");
     spawner.spawn(http_wk(http_client1, "http://mobile-j.de", 120000, "client1")).unwrap();
@@ -109,7 +114,7 @@ async fn main(spawner: Spawner) {
             static EXECUTOR: StaticCell<Executor> = StaticCell::new();
             let executor = EXECUTOR.init(Executor::new());
             executor.run(|spawner| {
-                spawner.spawn(control_led(led, led_ctrl_signal)).ok();
+                spawner.spawn(control_led(led_pin, rmt, led_ctrl_signal)).ok();
             });
         })
         .unwrap();

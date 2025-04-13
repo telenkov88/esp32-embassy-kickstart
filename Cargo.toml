@@ -20,29 +20,10 @@ embassy-net = { version = "0.6.0", features = [
   "medium-ethernet",
   "proto-ipv4",
 ] }
-embedded-io = "0.6.1"
-embedded-io-async = "0.6.1"
+
 esp-alloc = "0.7.0"
 esp-hal = { version = "1.0.0-beta.0", features = ["esp32s3", "unstable"] }
-cfg-if              = "1.0.0"
-smoltcp = { version = "0.12.0", default-features = false, features = [
-  "medium-ethernet",
-  "multicast",
-  "proto-dhcpv4",
-  "proto-dns",
-  "proto-ipv4",
-  "socket-dns",
-  "socket-icmp",
-  "socket-raw",
-  "socket-tcp",
-  "socket-udp",
-] }
-# for more networking protocol support see https://crates.io/crates/edge-net
-bleps = { git = "https://github.com/bjoernQ/bleps", package = "bleps", rev = "a5148d8ae679e021b78f53fd33afb8bb35d0b62e", features = [
-  "async",
-  "macros",
-] }
-critical-section = "1.2.0"
+
 embassy-executor = { version = "0.7.0", features = ["task-arena-size-98304"] }
 embassy-time = { version = "0.4.0", features = ["generic-queue-8"] }
 esp-hal-embassy = { version = "0.7.0", features = ["esp32s3"] }
@@ -64,7 +45,9 @@ esp-backtrace = {version = "0.15.1", features = ["esp32s3", "exception-handler",
 # HTTP
 reqwless = { version = "0.13", default-features = false, features = ["alloc", "embedded-tls", "log"] }
 
-rand_core = { version = "0.9.3", default-features = true }
+# Neopixel
+esp-hal-smartled = { git = "https://github.com/esp-rs/esp-hal-community", rev = "a613668" }
+smart-leds = "0.4.0"
 
 [profile.dev]
 # Rust debug is too slow.
