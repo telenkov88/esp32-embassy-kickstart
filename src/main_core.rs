@@ -8,13 +8,13 @@ pub async fn enable_disable_led(led_ctrl_signal: &'static Signal<CriticalSection
         "Starting enable_disable_led() on core {}",
         Cpu::current() as usize
     );
-    let mut ticker = Ticker::every(Duration::from_secs(10));
+    let mut ticker = Ticker::every(Duration::from_secs(1));
     loop {
-        println!("Sending LED on");
+        //println!("Sending LED on");
         led_ctrl_signal.signal(true);
         ticker.next().await;
 
-        println!("Sending LED off");
+        //println!("Sending LED off");
         led_ctrl_signal.signal(false);
         ticker.next().await;
     }

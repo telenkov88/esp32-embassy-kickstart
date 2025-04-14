@@ -10,7 +10,7 @@
 extern crate alloc;
 
 use core::ptr::addr_of_mut;
-
+use core::sync::atomic::{AtomicBool, Ordering};
 use embassy_executor::{task, Spawner};
 use embassy_net::tcp::client::{TcpClient, TcpClientState};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
@@ -32,6 +32,7 @@ mod second_core;
 mod main_core;
 mod http;
 mod wifi;
+
 use second_core::control_led;
 use main_core::enable_disable_led;
 use wifi::connect as connect_to_wifi;
@@ -44,6 +45,13 @@ static TCP_CLIENT: StaticCell<TcpClient<'static, 3>> = StaticCell::new();
 
 static CLIENT_STATE2: StaticCell<TcpClientState<3, 1024, 1024>> = StaticCell::new();
 static TCP_CLIENT2: StaticCell<TcpClient<'static, 3>> = StaticCell::new();
+
+
+pub static WIFI_INITIALIZED: AtomicBool = AtomicBool::new(false);
+pub static WIFI_MODE_CLIENT: AtomicBool = AtomicBool::new(false);
+pub static TIME_SYNCED: AtomicBool = AtomicBool::new(false);
+pub static FIRMWARE_UPGRADE_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
+
 
 const fn or_str(opt: Option<&'static str>, default: &'static str) -> &'static str {
     if let Some(val) = opt {
@@ -72,8 +80,18 @@ pub async fn http_wk(mut http_client: EmbassyHttpClient<'static,'static,3>, url:
 async fn main(spawner: Spawner) {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
+    
+    
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+
+    // Neopixel
+    let led_pin = peripherals.GPIO48;
+    let freq = Rate::from_mhz(80);
+    let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
+    static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
+    let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
+    
     let timer_g0 = TimerGroup::new(peripherals.TIMG0);
     let rng = Rng::new(peripherals.RNG);
     let timer_g1 = TimerGroup::new(peripherals.TIMG1);
@@ -83,10 +101,21 @@ async fn main(spawner: Spawner) {
 
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
-    static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
-    let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
+    // Worker for Led indication
+    let _guard = cpu_control
+        .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {
+            static EXECUTOR: StaticCell<Executor> = StaticCell::new();
+            let executor = EXECUTOR.init(Executor::new());
+            executor.run(|spawner| {
+                spawner.spawn(control_led(led_pin, rmt, led_ctrl_signal)).ok();
+            });
+        })
+        .unwrap();
+
     
     let stack = connect_to_wifi(spawner, timer_g0, rng, peripherals.WIFI, peripherals.RADIO_CLK, SSID,  PASSWORD).await.unwrap();
+    WIFI_INITIALIZED.store(true, Ordering::Release);
+    WIFI_MODE_CLIENT.store(false, Ordering::Release);
     println!(">>>>>>>>>>> System Init finished <<<<<<<<<<<<<<<<<<<<<,");
     
     let client_state = CLIENT_STATE.init(TcpClientState::new());
@@ -99,25 +128,13 @@ async fn main(spawner: Spawner) {
 
     
     println!(">>>>>>>>>>> Init finished <<<<<<<<<<<<<<<<<<<<<<<<<<<<,");
-    let led_pin = peripherals.GPIO48;
-    let freq = Rate::from_mhz(80);
-    let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
+ 
 
     println!(">>>> Starting http worker 1");
     spawner.spawn(http_wk(http_client1, "http://mobile-j.de", 120000, "client1")).unwrap();
     Timer::after(Duration::from_secs(5)).await;
     println!(">>>> Starting http worker 2");
     spawner.spawn(http_wk(http_client2, "http://mobile-j.de", 120000, "client2")).unwrap();
-
-    let _guard = cpu_control
-        .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {
-            static EXECUTOR: StaticCell<Executor> = StaticCell::new();
-            let executor = EXECUTOR.init(Executor::new());
-            executor.run(|spawner| {
-                spawner.spawn(control_led(led_pin, rmt, led_ctrl_signal)).ok();
-            });
-        })
-        .unwrap();
-
+    
     enable_disable_led(led_ctrl_signal).await;
 }
