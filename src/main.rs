@@ -7,6 +7,7 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 #![feature(adt_const_params)]
+#![feature(impl_trait_in_assoc_type)]
 extern crate alloc;
 
 use core::ptr::addr_of_mut;
@@ -33,10 +34,20 @@ mod main_core;
 mod http;
 mod wifi;
 
+mod web_server;
+mod shared;
+
 use second_core::control_led;
 use main_core::enable_disable_led;
 use wifi::connect as connect_to_wifi;
 use crate::http::{EmbassyHttpClient};
+
+use web_server::web_task;
+use picoserve::{
+    make_static,
+    AppBuilder, AppRouter,
+};
+use crate::web_server::AppProps;
 
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 static CLIENT_STATE: StaticCell<TcpClientState<3, 1024, 1024>> = StaticCell::new();
@@ -46,11 +57,12 @@ static TCP_CLIENT: StaticCell<TcpClient<'static, 3>> = StaticCell::new();
 static CLIENT_STATE2: StaticCell<TcpClientState<3, 1024, 1024>> = StaticCell::new();
 static TCP_CLIENT2: StaticCell<TcpClient<'static, 3>> = StaticCell::new();
 
-
 pub static WIFI_INITIALIZED: AtomicBool = AtomicBool::new(false);
 pub static WIFI_MODE_CLIENT: AtomicBool = AtomicBool::new(false);
 pub static TIME_SYNCED: AtomicBool = AtomicBool::new(false);
 pub static FIRMWARE_UPGRADE_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
+
+
 
 
 const fn or_str(opt: Option<&'static str>, default: &'static str) -> &'static str {
@@ -136,5 +148,26 @@ async fn main(spawner: Spawner) {
     println!(">>>> Starting http worker 2");
     spawner.spawn(http_wk(http_client2, "http://mobile-j.de", 120000, "client2")).unwrap();
     
+    // Web server worker
+    let sse_message_watch = web_server::init_sse_message_watch();
+    let sse_message_sender = sse_message_watch.sender();
+    let app = make_static!(AppRouter<AppProps>, AppProps.build_app());
+    let config = make_static!(
+        picoserve::Config<Duration>,
+        picoserve::Config::new(picoserve::Timeouts {
+            start_read_request: Some(Duration::from_secs(5)),
+            read_request: Some(Duration::from_secs(1)),
+            write: Some(Duration::from_secs(1)),
+        })
+        .keep_connection_alive()
+    );
+    for id in 0..web_server::WEB_TASK_POOL_SIZE {
+        spawner.must_spawn(web_task(id, *stack, app, config));
+    }
+    
+    // Update SSE the message
+    sse_message_sender.clear();
+    sse_message_sender.send("123".parse().unwrap());
+    // Fist core worker
     enable_disable_led(led_ctrl_signal).await;
 }
