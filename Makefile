@@ -19,7 +19,7 @@ firmware:
 	espflash save-image --chip esp32s3 target/xtensa-esp32s3-none-elf/release/dual-core app.bin
 
 flash:
-	espflash flash ./target/xtensa-esp32s3-none-elf/release/dual-core
+	espflash flash --partition-table=./src/partitions.csv -s 16mb --monitor --chip esp32s3 ./target/xtensa-esp32s3-none-elf/release/dual-core
 
 monitor:
 	espflash monitor
