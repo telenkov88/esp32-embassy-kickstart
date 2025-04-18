@@ -1,5 +1,5 @@
 [target.xtensa-esp32s3-none-elf]
-runner = "espflash flash --partition-table=./src/partitions.csv -s 16mb --monitor --chip esp32s3"
+runner = "espflash flash --partition-table=./partitions.csv -s 16mb --monitor --chip esp32s3"
 
 [env]
 
