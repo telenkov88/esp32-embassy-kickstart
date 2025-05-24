@@ -2,6 +2,10 @@
 edition = "2021"
 name    = "dual-core"
 version = "0.1.0"
+resolver = "2"
+
+[package.metadata.espflash]
+partition_table = "partitions.csv"
 
 [[bin]]
 name = "dual-core"
@@ -51,6 +55,11 @@ reqwless = { version = "0.13", default-features = false, features = ["alloc", "e
 # Neopixel
 esp-hal-smartled = { git = "https://github.com/esp-rs/esp-hal-community", rev = "a613668" }
 smart-leds = "0.4.0"
+
+# Filesystem
+esp-storage = {version = "0.5.0", features = ["esp32s3"]}
+embedded-storage = { version = "0.3" }
+esp-bootloader-esp-idf = { git = "https://github.com/esp-rs/esp-hal"}
 
 [profile.dev]
 # Rust debug is too slow.

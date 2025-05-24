@@ -25,6 +25,7 @@ use esp_hal::rng::Rng;
 use esp_hal::{rmt::Rmt, time::Rate};
 use esp_hal_embassy::Executor;
 use esp_println::println;
+
 use static_cell::StaticCell;
 
 mod neopixel;
@@ -37,10 +38,11 @@ mod wifi;
 mod web_server;
 mod shared;
 
+
 use second_core::control_led;
 use main_core::enable_disable_led;
 use wifi::connect as connect_to_wifi;
-use crate::http::{EmbassyHttpClient};
+use crate::http::EmbassyHttpClient;
 
 use web_server::web_task;
 use picoserve::{
@@ -48,6 +50,21 @@ use picoserve::{
     AppBuilder, AppRouter,
 };
 use crate::web_server::AppProps;
+
+mod ota;
+use embedded_storage::{ReadStorage, Storage};
+use esp_bootloader_esp_idf::ota::Slot;
+use esp_storage::FlashStorage;
+use esp_bootloader_esp_idf::partitions;
+use esp_bootloader_esp_idf::partitions::DataPartitionSubType;
+use crate::partitions::{
+    read_partition_table,
+    PartitionType, AppPartitionSubType,
+};
+
+/* ───── Partition.csv constants ───── */
+const CFG_OFFSET: u32 = 0x810000;
+const CFG_SIZE:   u32 = 0x100000;
 
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 static CLIENT_STATE: StaticCell<TcpClientState<3, 1024, 1024>> = StaticCell::new();
@@ -92,10 +109,51 @@ pub async fn http_wk(mut http_client: EmbassyHttpClient<'static,'static,3>, url:
 async fn main(spawner: Spawner) {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
-    
+
+    let mut storage = esp_storage::FlashStorage::new();
+    let mut flash = FlashStorage::new();
+    let mut ota_update = ota::OtaUpdate::new(&mut flash).unwrap();
+    let current_ota = ota_update.current_slot(&mut flash).unwrap();
+    println!("current {:?} - next {:?}", current_ota, current_ota.next());
+    println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>");
     
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+
+    // Partition table Init
+
+    println!("Flash size = {}", flash.capacity());
+    let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
+    let pt = partitions::read_partition_table(&mut flash, &mut pt_mem).unwrap();
+    println!("Partition table len: {:?}", pt.len());
+    let partition =pt.find_partition(PartitionType::App(AppPartitionSubType::Ota0)).unwrap();
+    let ota_offset = partition.unwrap().offset();
+    println!("Ota2 offset {}", ota_offset);
+    let ota_part = pt
+        .find_partition(esp_bootloader_esp_idf::partitions::PartitionType::Data(
+            DataPartitionSubType::Ota,
+        ))
+        .unwrap()
+        .unwrap();
+    let mut ota_part = ota_part.as_embedded_storage(&mut storage);
+    println!("Found ota data");
+    let mut ota = esp_bootloader_esp_idf::ota::Ota::new(&mut ota_part).unwrap();
+    let current = ota.current_slot().unwrap();
+    println!("current image state {:?}", ota.current_ota_state());
+    println!("current {:?} - next {:?}", current, current.next());
+    if ota.current_slot().unwrap() != Slot::None
+        && (ota.current_ota_state().unwrap() == esp_bootloader_esp_idf::ota::OtaImageState::New
+        || ota.current_ota_state().unwrap()
+        == esp_bootloader_esp_idf::ota::OtaImageState::PendingVerify)
+    {
+        println!("Changed OTA state to VALID");
+        ota.set_current_ota_state(esp_bootloader_esp_idf::ota::OtaImageState::Valid)
+            .unwrap();
+    }
+    // Switch partitions
+    println!("Change slot to next OTA");
+    ota.set_current_slot(current.next()).unwrap();
+    ota.set_current_ota_state(esp_bootloader_esp_idf::ota::OtaImageState::New).unwrap();
 
     // Neopixel
     let led_pin = peripherals.GPIO48;
@@ -128,6 +186,8 @@ async fn main(spawner: Spawner) {
     let stack = connect_to_wifi(spawner, timer_g0, rng, peripherals.WIFI, peripherals.RADIO_CLK, SSID,  PASSWORD).await.unwrap();
     WIFI_INITIALIZED.store(true, Ordering::Release);
     WIFI_MODE_CLIENT.store(false, Ordering::Release);
+
+    // Fs init
     println!(">>>>>>>>>>> System Init finished <<<<<<<<<<<<<<<<<<<<<,");
     
     let client_state = CLIENT_STATE.init(TcpClientState::new());
