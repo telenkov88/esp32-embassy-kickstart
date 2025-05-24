@@ -1,47 +1,59 @@
-use embedded_storage::{ReadStorage, Storage};
-use esp_bootloader_esp_idf::ota::Slot;
+use esp_bootloader_esp_idf::ota::{Ota, OtaImageState, Slot};
 use esp_storage::FlashStorage;
-use esp_bootloader_esp_idf::partitions;
-use esp_bootloader_esp_idf::partitions::{DataPartitionSubType, PartitionEntry, PartitionTable};
-use esp_hal::system::Stack;
-use static_cell::StaticCell;
+use esp_bootloader_esp_idf::partitions::{self, AppPartitionSubType, DataPartitionSubType, PartitionTable, PartitionType};
+use esp_println::println;
 
-static mut PT_MEM: Stack<8192> = Stack::new();
-static PT_STORAGE: StaticCell<[u8; partitions::PARTITION_TABLE_MAX_LEN]> = StaticCell::new();
+pub fn run_with_ota<F, R>(
+    flash_storage: &mut FlashStorage,
+    partition_buf: &mut [u8; partitions::PARTITION_TABLE_MAX_LEN],
+    operation: F,
+) -> Result<R, partitions::Error>
+where
+    F: FnOnce(&mut Ota<FlashStorage>) -> R,
+{
+    let pt:PartitionTable = partitions::read_partition_table(flash_storage, partition_buf)?;
+    println!("Partition table len: {:?}", pt.len());
 
-pub struct OtaUpdate {
-    /// Parsed view of the partition table.
-    pt: PartitionTable<'static>,
+    let ota_entry = pt
+        .find_partition(PartitionType::Data(DataPartitionSubType::Ota))?
+        .ok_or(partitions::Error::Invalid)?;
+
+    let mut ota_storage = ota_entry.as_embedded_storage(flash_storage);
+    let mut ota_handle = Ota::new(&mut ota_storage)
+        .map_err(|e| {
+            println!("OTA init failed: {:?}", e);
+            partitions::Error::Invalid
+        })?;
+    
+    let ota0_part =pt.find_partition(PartitionType::App(AppPartitionSubType::Ota0))?;
+    let ota0_offset = ota0_part.unwrap().offset();
+    let ota1_part =pt.find_partition(PartitionType::App(AppPartitionSubType::Ota1))?;
+    let ota1_offset = ota1_part.unwrap().offset();
+    println!("Ota0 offset {}, Ota1 offset {}", ota0_offset, ota1_offset);
+    println!("OTA initialized successfully");
+
+    Ok(operation(&mut ota_handle))
 }
 
-impl OtaUpdate {
-    /// Returns a raw pointer to the partition that the new app is/will be written to.
-    /// 
-    /// 
-    pub fn new(flash: &mut FlashStorage) -> Result<Self, partitions::Error> {
-        // Stable backing store living for the whole program
-        let buf = PT_STORAGE.init([0u8; partitions::PARTITION_TABLE_MAX_LEN]);
-        let pt = partitions::read_partition_table(flash, buf)?;
-        Ok(Self { pt })
-    }
+#[allow(dead_code)]
+pub fn set_next_ota_slot(next_slot: Slot, ota_handle: &mut Ota<FlashStorage>) {
+    println!("Setting OTA slot to {:?}", next_slot);
+    ota_handle.set_current_slot(next_slot).unwrap();
+    ota_handle
+        .set_current_ota_state(OtaImageState::New)
+        .unwrap();
+}
 
-    pub fn current_slot(
-        &mut self,
-        flash: &mut FlashStorage,
-    ) -> Result<Slot, partitions::Error> {
-        // ---- 1. find the *data/ota* partition entry ------------------------
-        let ota_data_entry = self
-            .pt
-            .find_partition(partitions::PartitionType::Data(
-                DataPartitionSubType::Ota,
-            ))?
-            .ok_or(partitions::Error::Invalid)?;
+pub fn validate_current_ota_slot(ota_handle: &mut Ota<FlashStorage>) {
+    let state = ota_handle.current_ota_state().unwrap();
+    let slot = ota_handle.current_slot().unwrap();
 
-        // ---- 2. turn it into a FlashRegion that borrows `flash` ------------
-        let mut region = ota_data_entry.as_embedded_storage(flash);
-
-        // ---- 3. create a *temporary* Ota helper and query it ---------------
-        let mut ota = esp_bootloader_esp_idf::ota::Ota::new(&mut region)?;
-        ota.current_slot()
+    if slot != Slot::None
+        && (state == OtaImageState::New || state == OtaImageState::PendingVerify)
+    {
+        println!("Marking current OTA slot as VALID");
+        ota_handle
+            .set_current_ota_state(OtaImageState::Valid)
+            .unwrap();
     }
 }

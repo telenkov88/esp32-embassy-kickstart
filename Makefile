@@ -8,6 +8,7 @@ deps:
 
 clean:
 	cargo clean
+	rm -rf app.bin
 
 build:
 	PASSWORD=${PASSWORD} SSID=${SSID} cargo build
@@ -21,7 +22,7 @@ firmware:
 flash:
 	espflash flash --partition-table=./partitions.csv -s 16mb --monitor --chip esp32s3 ./target/xtensa-esp32s3-none-elf/release/dual-core
 
-write-bin:
+write-bin: firmware
 	espflash write-bin --chip esp32s3 0x10000 app.bin && \
 	espflash write-bin --chip esp32s3 0x410000 app.bin
 
