@@ -10,6 +10,7 @@
 #![feature(impl_trait_in_assoc_type)]
 extern crate alloc;
 
+use crate::ota::{validate_current_ota_slot, run_with_ota};
 use core::ptr::addr_of_mut;
 use core::sync::atomic::{AtomicBool, Ordering};
 use embassy_executor::{task, Spawner};
@@ -25,6 +26,7 @@ use esp_hal::rng::Rng;
 use esp_hal::{rmt::Rmt, time::Rate};
 use esp_hal_embassy::Executor;
 use esp_println::println;
+
 use static_cell::StaticCell;
 
 mod neopixel;
@@ -37,10 +39,11 @@ mod wifi;
 mod web_server;
 mod shared;
 
+
 use second_core::control_led;
 use main_core::enable_disable_led;
 use wifi::connect as connect_to_wifi;
-use crate::http::{EmbassyHttpClient};
+use crate::http::EmbassyHttpClient;
 
 use web_server::web_task;
 use picoserve::{
@@ -48,6 +51,17 @@ use picoserve::{
     AppBuilder, AppRouter,
 };
 use crate::web_server::AppProps;
+
+mod ota;
+use embedded_storage::{ReadStorage};
+use esp_bootloader_esp_idf::ota::Slot;
+use esp_storage::FlashStorage;
+use esp_bootloader_esp_idf::partitions;
+use esp_hal::peripherals::Peripherals;
+/* ───── Partition.csv constants ───── */
+//const CFG_OFFSET: u32 = 0x810000;
+//const CFG_SIZE:   u32 = 0x100000;
+
 
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 static CLIENT_STATE: StaticCell<TcpClientState<3, 1024, 1024>> = StaticCell::new();
@@ -61,8 +75,6 @@ pub static WIFI_INITIALIZED: AtomicBool = AtomicBool::new(false);
 pub static WIFI_MODE_CLIENT: AtomicBool = AtomicBool::new(false);
 pub static TIME_SYNCED: AtomicBool = AtomicBool::new(false);
 pub static FIRMWARE_UPGRADE_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
-
-
 
 
 const fn or_str(opt: Option<&'static str>, default: &'static str) -> &'static str {
@@ -92,18 +104,38 @@ pub async fn http_wk(mut http_client: EmbassyHttpClient<'static,'static,3>, url:
 async fn main(spawner: Spawner) {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
+
+    println!("****************** Storage Init ******************");
+    let mut flash = FlashStorage::new();
+    println!("Flash size = {}", flash.capacity());
     
-    
+    println!("****************** Peripherals Init ******************");
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    // Neopixel
+    println!("****************** OTA Init ******************");
+    let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
+    run_with_ota(&mut flash, &mut pt_mem, |ota| {
+        let current = ota.current_slot().unwrap();
+        
+        if current != Slot::None {
+            ota.set_current_ota_state(esp_bootloader_esp_idf::ota::OtaImageState::Valid).unwrap();
+        }
+        println!("current OTA image state {:?}", ota.current_ota_state());
+        println!("current OTA {:?} - next {:?}", current, current.next());
+
+        validate_current_ota_slot(ota);
+        
+    }).unwrap();
+
+    println!("****************** NeoPixel Init ******************");
     let led_pin = peripherals.GPIO48;
     let freq = Rate::from_mhz(80);
     let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
-    
+
+    println!("****************** Timers Init ******************");
     let timer_g0 = TimerGroup::new(peripherals.TIMG0);
     let rng = Rng::new(peripherals.RNG);
     let timer_g1 = TimerGroup::new(peripherals.TIMG1);
@@ -113,7 +145,7 @@ async fn main(spawner: Spawner) {
 
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
-    // Worker for Led indication
+    println!("****************** Led Worker Init ******************");
     let _guard = cpu_control
         .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {
             static EXECUTOR: StaticCell<Executor> = StaticCell::new();
@@ -124,10 +156,11 @@ async fn main(spawner: Spawner) {
         })
         .unwrap();
 
-    
+    println!("****************** Wifi Init ******************");
     let stack = connect_to_wifi(spawner, timer_g0, rng, peripherals.WIFI, peripherals.RADIO_CLK, SSID,  PASSWORD).await.unwrap();
     WIFI_INITIALIZED.store(true, Ordering::Release);
     WIFI_MODE_CLIENT.store(false, Ordering::Release);
+
     println!(">>>>>>>>>>> System Init finished <<<<<<<<<<<<<<<<<<<<<,");
     
     let client_state = CLIENT_STATE.init(TcpClientState::new());
@@ -139,7 +172,7 @@ async fn main(spawner: Spawner) {
     let http_client2 = EmbassyHttpClient::new(stack, tcp_client2);
 
     
-    println!(">>>>>>>>>>> Init finished <<<<<<<<<<<<<<<<<<<<<<<<<<<<,");
+    println!(">>>>>>>>>>> HTTP Clients Init finished <<<<<<<<<<<<<<<<<<<<<<<<<<<<,");
  
 
     println!(">>>> Starting http worker 1");
