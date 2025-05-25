@@ -3,8 +3,12 @@ name: Build & Publish Release
 on:
   push:
     tags:
-      - '*'
+      - develop
   workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
 
 jobs:
   build:
@@ -12,27 +16,23 @@ jobs:
 
     container:
       image: ghcr.io/telenkov88/idf-rust-esp32:latest
+      options: --user esp
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up ESP environment
-        run: |
-          source /home/esp/export-esp.sh
-
       - name: Build (release & firmware)
         run: |
+          . /home/esp/export-esp.sh
           make release
           make firmware
 
-      - name: Package output artifacts
+      - name: Package firmware
+        id: package
         run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          ZIP_NAME=firmware-${TAG}.zip
-          cd output
-          zip -r "../${ZIP_NAME}" ./*
-          echo "zip=${ZIP_NAME}" >> $GITHUB_OUTPUT
+          zip esp32s3-firmware.zip -j output/firmware.bin
+          echo "zip=esp32s3-firmware.zip" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         id: create_release
@@ -52,3 +52,5 @@ jobs:
           asset_path: ./${{ steps.package.outputs.zip }}
           asset_name: ${{ steps.package.outputs.zip }}
           asset_content_type: application/zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
