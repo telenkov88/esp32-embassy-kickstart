@@ -8,7 +8,7 @@ USER root
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       curl build-essential cmake git python3-pip \
-      libssl-dev pkg-config ca-certificates \
+      libssl-dev pkg-config ca-certificates zip \
       libudev-dev \
     && apt clean && \
     useradd -m esp &&\
