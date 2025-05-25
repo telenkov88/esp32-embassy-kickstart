@@ -1,4 +1,4 @@
-use esp_bootloader_esp_idf::ota::{Ota, OtaImageState, Slot};
+pub(crate) use esp_bootloader_esp_idf::ota::{Ota, OtaImageState, Slot};
 use esp_storage::FlashStorage;
 use esp_bootloader_esp_idf::partitions::{self, AppPartitionSubType, DataPartitionSubType, PartitionTable, PartitionType};
 use esp_println::println;

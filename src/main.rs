@@ -57,11 +57,7 @@ use embedded_storage::{ReadStorage};
 use esp_bootloader_esp_idf::ota::Slot;
 use esp_storage::FlashStorage;
 use esp_bootloader_esp_idf::partitions;
-use esp_hal::peripherals::Peripherals;
-/* ───── Partition.csv constants ───── */
-//const CFG_OFFSET: u32 = 0x810000;
-//const CFG_SIZE:   u32 = 0x100000;
-
+use ota::OtaImageState::Valid;
 
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 static CLIENT_STATE: StaticCell<TcpClientState<3, 1024, 1024>> = StaticCell::new();
@@ -119,7 +115,7 @@ async fn main(spawner: Spawner) {
         let current = ota.current_slot().unwrap();
         
         if current != Slot::None {
-            ota.set_current_ota_state(esp_bootloader_esp_idf::ota::OtaImageState::Valid).unwrap();
+            ota.set_current_ota_state(Valid).unwrap(); 
         }
         println!("current OTA image state {:?}", ota.current_ota_state());
         println!("current OTA {:?} - next {:?}", current, current.next());
