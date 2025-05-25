@@ -5,7 +5,7 @@ make deps
 ```
 
 ```
-source ~/export-esp.sh
+. $HOME/export-esp.sh
 ```
 
 ```
@@ -15,8 +15,13 @@ make build
 ## Flashing Firmware
 export PASSWORD='WIFI_PASSWORD'
 
-SSID='WIFI_SSID'
+export SSID='WIFI_SSID'
 
 ```
 make run
+```
+
+## Docker build
+```
+make docker-build
 ```
