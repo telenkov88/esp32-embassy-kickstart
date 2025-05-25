@@ -42,9 +42,6 @@ docker-build:
 	rm -rf output/firmware.bin
 	docker run ${DOCKER_ARGS} ${DOCKER_IMG} bash -c 'make release && make firmware'
 
-docker-push:
-    docker push ${DOCKER_IMG}
-
 release: clean
 	PASSWORD=${PASSWORD} SSID=${SSID} cargo build --release
 
