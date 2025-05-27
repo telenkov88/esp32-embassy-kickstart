@@ -1,8 +1,10 @@
+use embassy_executor::task;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use esp_println::println;
 use esp_hal::system::Cpu;
 use embassy_time::{Duration, Ticker};
 
+#[task]
 pub async fn enable_disable_led(led_ctrl_signal: &'static Signal<CriticalSectionRawMutex, bool>) -> ! {
     println!(
         "Starting enable_disable_led() on core {}",

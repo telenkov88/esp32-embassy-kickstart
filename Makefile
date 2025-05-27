@@ -55,7 +55,7 @@ flash:
 
 flash-firmware:
 	espflash write-bin --chip esp32s3 0x10000 output/firmware.bin && \
-	espflash write-bin --chip esp32s3 0x410000 output/firmware.bin
+	espflash write-bin --chip esp32s3 0x510000 output/firmware.bin
 
 monitor:
 	espflash monitor
