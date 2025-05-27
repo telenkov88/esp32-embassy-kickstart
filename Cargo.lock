@@ -375,12 +375,15 @@ dependencies = [
 name = "dual-core"
 version = "0.1.0"
 dependencies = [
+ "ekv",
+ "embassy-embedded-hal",
  "embassy-executor",
  "embassy-futures",
  "embassy-net",
  "embassy-sync",
  "embassy-time",
  "embedded-storage",
+ "embedded-storage-async",
  "esp-alloc",
  "esp-backtrace",
  "esp-bootloader-esp-idf",
@@ -395,6 +398,16 @@ dependencies = [
  "reqwless",
  "smart-leds",
  "static_cell",
+]
+
+[[package]]
+name = "ekv"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab888debca410aa6f2726fb363926ca73539378c5e8880c8f08f35ae4b24d938"
+dependencies = [
+ "embassy-sync",
+ "heapless 0.8.0",
 ]
 
 [[package]]

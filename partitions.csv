@@ -1,17 +1,19 @@
-# nvs,      16K
-# otadata,  8K
-# phy_init, 4K
-# ota_0,    4M
-# ota_1,    4M
-# configs   1M
-# logs      6.875M
-# coredump  64k
-# Name,	    Type,	SubType,	Offset,	    Size,	    Flags
-nvs,        data,	nvs,        0x9000,	    0x4000,
-otadata,	data,   ota,	    0xd000,	    0x2000,
-phy_init,	data,	phy,	    0xf000,	    0x1000,
-ota_0,      app,	ota_0,	    0x10000,	0x400000,
-ota_1,      app,	ota_1,  	0x410000,	0x400000,
-configs,    data,   fat,        0x810000,   0x100000,
-logs,       data,   fat,        0x910000,   0x6E0000,
-coredump,   data,   coredump,   0xFF0000,   0x10000,
+# nvs,      16  KiB
+# otadata,  8   KiB
+# phy_init, 4   KiB
+# ota_0,    5   MiB
+# ota_1,    5   MiB
+# configs   1   MiB (256×4 KiB pages)
+# tls_cert  512 KiB
+# logs_raw  4.4 MiB
+
+
+# Name,	    Type,	SubType,	     Offset,	    Size,	    Flags
+nvs,        data,	nvs,             0x9000,	    0x4000,
+otadata,	data,   ota,	         0xd000,	    0x2000,
+phy_init,	data,	phy,	         0xf000,	    0x1000,
+ota_0,      app,	ota_0,	         0x10000,    0x500000,
+ota_1,      app,	ota_1,  	     0x510000,   0x500000,
+configs,    data,   undefined,       0xA10000,   0x100000,
+tls_cert,   data,   undefined,       0xB10000,   0x080000,
+logs_raw,   data,   undefined,       0xB90000,   0x470000,

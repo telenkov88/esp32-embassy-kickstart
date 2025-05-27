@@ -59,6 +59,14 @@ use esp_storage::FlashStorage;
 use esp_bootloader_esp_idf::partitions;
 use ota::OtaImageState::Valid;
 
+mod db;
+use ekv::Database;
+use embassy_sync::blocking_mutex::raw::NoopRawMutex;
+use crate::db::DbFlash;
+
+const CONFIG_PARTITION_START: usize = 0xA10000;
+
+
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 static CLIENT_STATE: StaticCell<TcpClientState<3, 1024, 1024>> = StaticCell::new();
 static TCP_CLIENT: StaticCell<TcpClient<'static, 3>> = StaticCell::new();
@@ -100,10 +108,9 @@ pub async fn http_wk(mut http_client: EmbassyHttpClient<'static,'static,3>, url:
 async fn main(spawner: Spawner) {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
-
     println!("****************** Storage Init ******************");
-    let mut flash = FlashStorage::new();
-    println!("Flash size = {}", flash.capacity());
+    let mut ota_flash = FlashStorage::new();
+    println!("Flash size = {}", ota_flash.capacity());
     
     println!("****************** Peripherals Init ******************");
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
@@ -111,7 +118,7 @@ async fn main(spawner: Spawner) {
 
     println!("****************** OTA Init ******************");
     let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
-    run_with_ota(&mut flash, &mut pt_mem, |ota| {
+    run_with_ota(&mut ota_flash, &mut pt_mem, |ota| {
         let current = ota.current_slot().unwrap();
         
         if current != Slot::None {
@@ -151,7 +158,9 @@ async fn main(spawner: Spawner) {
             });
         })
         .unwrap();
-
+    println!("****************** Led Control Init ******************");
+    spawner.spawn(enable_disable_led(led_ctrl_signal)).unwrap();
+    
     println!("****************** Wifi Init ******************");
     let stack = connect_to_wifi(spawner, timer_g0, rng, peripherals.WIFI, peripherals.RADIO_CLK, SSID,  PASSWORD).await.unwrap();
     WIFI_INITIALIZED.store(true, Ordering::Release);
@@ -196,7 +205,38 @@ async fn main(spawner: Spawner) {
     
     // Update SSE the message
     sse_message_sender.clear();
-    sse_message_sender.send("123".parse().unwrap());
-    // Fist core worker
-    enable_disable_led(led_ctrl_signal).await;
+    sse_message_sender.send("Hello SSE!".parse().unwrap());
+
+    println!("****************** DB Init ******************");
+    let db_flash = DbFlash {
+        flash: embassy_embedded_hal::adapter::BlockingAsync::new(FlashStorage::new()),
+        start: CONFIG_PARTITION_START,
+    };
+    let db = Database::<_, NoopRawMutex>::new(db_flash, ekv::Config::default());
+
+    if db.mount().await.is_err() {
+        println!("Formatting...");
+        db.format().await.unwrap();
+    }
+
+    let mut wtx = db.write_transaction().await;
+    wtx.write(b"HELLO", b"WORLD").await.unwrap();
+    wtx.commit().await.unwrap();
+
+    let rtx = db.read_transaction().await;
+    let mut buf = [0u8; 32];
+    let hello = rtx.read(b"HELLO", &mut buf).await.map(|n| &buf[..n]).ok();
+    if let Some(s) = hello {
+        if let Ok(text) = core::str::from_utf8(s) {
+            println!("HELLO: {}", text);
+        } else {
+            println!("HELLO (invalid UTF-8): {:?}", s);
+        }
+    }
+
+    println!(">>>>>>>>>>> Init finished <<<<<<<<<<<<<<<<<<<<<,");
+
+    loop {
+        Timer::after(Duration::from_secs(60)).await;
+    }
 }

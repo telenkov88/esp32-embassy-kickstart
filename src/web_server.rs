@@ -11,7 +11,7 @@ use picoserve::response::sse;
 use picoserve::routing::{get, get_service};
 use static_cell::StaticCell;
 
-pub const WEB_TASK_POOL_SIZE: usize = 12; // Panic if embassy_executor arena too small
+pub const WEB_TASK_POOL_SIZE: usize = 2; // Panic if embassy_executor arena too small
 
 // SSE buffer
 pub type MessageWatch = Watch<CriticalSectionRawMutex, String<128>, 1>;
