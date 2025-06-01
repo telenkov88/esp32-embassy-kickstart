@@ -1,6 +1,3 @@
-#[allow(unused_imports)]
-use esp_backtrace as _;
-
 use embedded_storage_async::nor_flash::{NorFlash as AsyncNorFlash, ReadNorFlash};
 use ekv::flash::{self, PageID};
 use ekv::{config};

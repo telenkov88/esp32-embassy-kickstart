@@ -1,15 +1,19 @@
+use heapless::{String};
+
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::watch::{Watch};
 use embassy_time::{Duration, Timer};
 use esp_hal::xtensa_lx::_export::critical_section;
 use esp_println::println;
-use heapless::String;
 use picoserve::{AppBuilder, AppRouter};
+use picoserve::extract::Json;
 use picoserve::io::embedded_io_async;
 use picoserve::response::ws;
 use picoserve::response::sse;
-use picoserve::routing::{get, get_service};
+use picoserve::routing::{get, get_service, post};
 use static_cell::StaticCell;
+use crate::config::{update_wifi_settings, WifiSettings};
+use crate::DbMutex;
 
 pub const WEB_TASK_POOL_SIZE: usize = 2; // Panic if embassy_executor arena too small
 
@@ -53,13 +57,22 @@ pub fn create_sse_events() -> SseEvents {
 }
 
 
-pub struct AppProps;
+
+
+pub struct AppProps {
+    db: &'static DbMutex,
+}
+
+impl AppProps {
+    pub fn new(db: &'static DbMutex) -> Self { Self { db } }
+}
 
 impl AppBuilder for AppProps {
     type PathRouter = impl picoserve::routing::PathRouter;
 
     fn build_app(self) -> picoserve::Router<Self::PathRouter> {
-
+        let db = self.db;
+        
         picoserve::Router::new()
             .route(
                 "/",
@@ -89,6 +102,20 @@ impl AppBuilder for AppProps {
                 "/events",
                 get(|| picoserve::response::EventStream(create_sse_events())),
             )
+            .route(
+                "/settings",
+                post(move |Json(settings): Json<WifiSettings>| {
+                    async move {
+                        let _ = update_wifi_settings(&settings, db).await;
+                        picoserve::response::DebugValue((
+                            ("hostname", settings.hostname),
+                            ("ssid",     settings.ssid),
+                            ("psw",      settings.psw),
+                        ))
+                    }
+                }),
+            )
+
     }
 }
 

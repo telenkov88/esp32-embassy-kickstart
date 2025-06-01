@@ -1,5 +1,5 @@
-PASSWORD?='DEMO_WIFI_PASSWORD'
-SSID?='DEMO_WIFI_SSID'
+PASSWORD?='MyDefaultPsw'
+SSID?='MyDefaultSSID'
 
 DOCKER_IMG = ghcr.io/telenkov88/idf-rust-esp32:latest
 
@@ -48,13 +48,21 @@ release: clean
 firmware:
 	mkdir -p output
 	espflash save-image ${ESPFLASH_ARGS} output/firmware.bin
+	espflash partition-table --to-binary partitions.csv > output/partitions.bin
+	cp -r partitions.csv output/partitions.csv
+	chmod 777 output/partitions.csv
 	chmod 777 output/firmware.bin
+	chmod 777 output/partitions.bin
+
+erase:
+	espflash erase-flash
 
 flash:
-	espflash flash ${ESPFLASH_ARGS}
+	espflash flash ${ESPFLASH_ARGS} -B 921600
 
-flash-firmware:
-	espflash write-bin --chip esp32s3 0x10000 output/firmware.bin && \
+flash-firmware: firmware
+	espflash write-bin --chip esp32s3 0x8000 output/partitions.bin
+	espflash write-bin --chip esp32s3 0x10000 output/firmware.bin
 	espflash write-bin --chip esp32s3 0x510000 output/firmware.bin
 
 monitor:
