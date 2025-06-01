@@ -31,17 +31,15 @@ pub async fn control_led(
     smart_led.set_rgb(r,g,b, brightness).unwrap();
     loop {
         if control.wait().await {
-            //println!("LED on from CPU{}", Cpu::current() as usize);
             brightness = 2;
         } else {
-            //println!("LED off");
             brightness = 1;
         }
         if FIRMWARE_UPGRADE_IN_PROGRESS.load(Ordering::Acquire) {
             r = 255; g=140; b=0; // Firmware upgrade in progress. dark orange
-        } else if WIFI_INITIALIZED.load(Ordering::Acquire) && !WIFI_MODE_CLIENT.load(Ordering::Acquire) {
-            r = 0; g=255; b=0; // Wi-fi online, Client mod. Green
         } else if WIFI_INITIALIZED.load(Ordering::Acquire) && WIFI_MODE_CLIENT.load(Ordering::Acquire) {
+            r = 0; g=255; b=0; // Wi-fi online, Client mod. Green
+        } else if WIFI_INITIALIZED.load(Ordering::Acquire) && !WIFI_MODE_CLIENT.load(Ordering::Acquire) {
             r = 0; g=0; b=255; // Wi-fi online, AP mod.     Blue
         } else {
             r=255; g=0; b=0;   // Wi-fi offline.            Red

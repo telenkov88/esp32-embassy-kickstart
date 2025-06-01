@@ -42,7 +42,7 @@ mod shared;
 
 use second_core::control_led;
 use main_core::enable_disable_led;
-use wifi::connect as connect_to_wifi;
+use wifi::init_wifi as connect_to_wifi;
 use crate::http::EmbassyHttpClient;
 
 use web_server::web_task;
@@ -60,9 +60,14 @@ use esp_bootloader_esp_idf::partitions;
 use ota::OtaImageState::Valid;
 
 mod db;
-use ekv::Database;
-use embassy_sync::blocking_mutex::raw::NoopRawMutex;
-use crate::db::DbFlash;
+mod config;
+
+use embassy_embedded_hal::adapter::BlockingAsync;
+use embassy_sync::mutex::Mutex;
+use heapless::String;
+use crate::config::{get_default_credentials, get_wifi_credentials};
+use crate::db::{DbFlash};
+use crate::wifi::WifiMode;
 
 const CONFIG_PARTITION_START: usize = 0xA10000;
 
@@ -71,9 +76,6 @@ static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 static CLIENT_STATE: StaticCell<TcpClientState<3, 1024, 1024>> = StaticCell::new();
 static TCP_CLIENT: StaticCell<TcpClient<'static, 3>> = StaticCell::new();
 
-
-static CLIENT_STATE2: StaticCell<TcpClientState<3, 1024, 1024>> = StaticCell::new();
-static TCP_CLIENT2: StaticCell<TcpClient<'static, 3>> = StaticCell::new();
 
 pub static WIFI_INITIALIZED: AtomicBool = AtomicBool::new(false);
 pub static WIFI_MODE_CLIENT: AtomicBool = AtomicBool::new(false);
@@ -103,6 +105,12 @@ pub async fn http_wk(mut http_client: EmbassyHttpClient<'static,'static,3>, url:
     }
 }
 
+type PhysFlash   = FlashStorage;
+type AsyncFlash  = BlockingAsync<PhysFlash>;          // <- fixes error #1
+type FlashLayer  = DbFlash<AsyncFlash>;
+type KvDatabase  = ekv::Database<FlashLayer, CriticalSectionRawMutex>; // <- fixes error #2
+type DbMutex     = Mutex<CriticalSectionRawMutex, KvDatabase>;
+static DB: StaticCell<DbMutex> = StaticCell::new();
 
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
@@ -131,6 +139,37 @@ async fn main(spawner: Spawner) {
         
     }).unwrap();
 
+    println!("****************** DB Init ******************");
+    let flash        = FlashStorage::new();
+    let async_flash  = BlockingAsync::new(flash);
+    let flash_layer  = FlashLayer { start: CONFIG_PARTITION_START, flash: async_flash };
+    let kv           = KvDatabase::new(flash_layer, ekv::Config::default());
+
+    let kv_mutex: &'static DbMutex = DB.init(Mutex::new(kv));
+    {
+        let db = kv_mutex.lock().await;
+        if db.mount().await.is_err() {
+            println!("Formatting Persistent EKV Storage...");
+            db.format().await.unwrap();
+        }
+    }
+
+    {
+        let db = kv_mutex.lock().await;
+        let mut buf = [0u8; 32];
+        let ssid = db.read_transaction().await
+            .read(b"wifi.ssid", &mut buf).await
+            .map(|n| &buf[..n]).ok();
+
+        if let Some(s) = ssid {
+            if let Ok(text) = core::str::from_utf8(s) {
+                println!("Wi-Fi ssid: {}", text);
+            } else {
+                println!("Wi-Fi ssid (invalid UTF-8): {:?}", s);
+            }
+        }
+    }
+    
     println!("****************** NeoPixel Init ******************");
     let led_pin = peripherals.GPIO48;
     let freq = Rate::from_mhz(80);
@@ -162,34 +201,56 @@ async fn main(spawner: Spawner) {
     spawner.spawn(enable_disable_led(led_ctrl_signal)).unwrap();
     
     println!("****************** Wifi Init ******************");
-    let stack = connect_to_wifi(spawner, timer_g0, rng, peripherals.WIFI, peripherals.RADIO_CLK, SSID,  PASSWORD).await.unwrap();
+    let (ssid, password, mode) = match get_wifi_credentials(kv_mutex).await {
+        Ok(creds) => {
+            println!("Using stored WiFi credentials");
+            println!("mdns name {}.local", creds.hostname);
+            (creds.ssid, creds.password, WifiMode::Sta)
+        }
+        Err(_) => {
+            let default_creds = get_default_credentials();
+            if !default_creds.ssid.is_empty() && default_creds.ssid != "MyDefaultSSID" {
+                println!("Using compile-time WiFi credentials");
+                (default_creds.ssid, default_creds.password, WifiMode::Sta)
+            } else {
+                println!("No valid credentials, starting in AP mode");
+                (String::new(), String::new(), WifiMode::Ap)
+            }
+        }
+    };
+    
+
+    let stack = connect_to_wifi(
+        spawner,
+        timer_g0,
+        rng,
+        peripherals.WIFI,
+        peripherals.RADIO_CLK,
+        ssid,
+        password,
+        mode,
+    ).await.unwrap();
+    
     WIFI_INITIALIZED.store(true, Ordering::Release);
-    WIFI_MODE_CLIENT.store(false, Ordering::Release);
 
     println!(">>>>>>>>>>> System Init finished <<<<<<<<<<<<<<<<<<<<<,");
     
     let client_state = CLIENT_STATE.init(TcpClientState::new());
     let tcp_client = TCP_CLIENT.init(TcpClient::new(*stack, client_state));
-    let http_client1 = EmbassyHttpClient::new(stack, tcp_client);
-
-    let client_state2 = CLIENT_STATE2.init(TcpClientState::new());
-    let tcp_client2 = TCP_CLIENT2.init(TcpClient::new(*stack, client_state2));
-    let http_client2 = EmbassyHttpClient::new(stack, tcp_client2);
-
+    let http_client = EmbassyHttpClient::new(stack, tcp_client);
     
     println!(">>>>>>>>>>> HTTP Clients Init finished <<<<<<<<<<<<<<<<<<<<<<<<<<<<,");
  
 
-    println!(">>>> Starting http worker 1");
-    spawner.spawn(http_wk(http_client1, "http://mobile-j.de", 120000, "client1")).unwrap();
-    Timer::after(Duration::from_secs(5)).await;
-    println!(">>>> Starting http worker 2");
-    spawner.spawn(http_wk(http_client2, "http://mobile-j.de", 120000, "client2")).unwrap();
+    println!(">>>> Starting http worker");
+    spawner.spawn(http_wk(http_client, "http://mobile-j.de", 120000, "client1")).unwrap();
+
     
     // Web server worker
     let sse_message_watch = web_server::init_sse_message_watch();
     let sse_message_sender = sse_message_watch.sender();
-    let app = make_static!(AppRouter<AppProps>, AppProps.build_app());
+    let app_props = AppProps::new(kv_mutex);
+    let app = make_static!(AppRouter<AppProps>, app_props.build_app());
     let config = make_static!(
         picoserve::Config<Duration>,
         picoserve::Config::new(picoserve::Timeouts {
@@ -207,32 +268,7 @@ async fn main(spawner: Spawner) {
     sse_message_sender.clear();
     sse_message_sender.send("Hello SSE!".parse().unwrap());
 
-    println!("****************** DB Init ******************");
-    let db_flash = DbFlash {
-        flash: embassy_embedded_hal::adapter::BlockingAsync::new(FlashStorage::new()),
-        start: CONFIG_PARTITION_START,
-    };
-    let db = Database::<_, NoopRawMutex>::new(db_flash, ekv::Config::default());
 
-    if db.mount().await.is_err() {
-        println!("Formatting...");
-        db.format().await.unwrap();
-    }
-
-    let mut wtx = db.write_transaction().await;
-    wtx.write(b"HELLO", b"WORLD").await.unwrap();
-    wtx.commit().await.unwrap();
-
-    let rtx = db.read_transaction().await;
-    let mut buf = [0u8; 32];
-    let hello = rtx.read(b"HELLO", &mut buf).await.map(|n| &buf[..n]).ok();
-    if let Some(s) = hello {
-        if let Ok(text) = core::str::from_utf8(s) {
-            println!("HELLO: {}", text);
-        } else {
-            println!("HELLO (invalid UTF-8): {:?}", s);
-        }
-    }
 
     println!(">>>>>>>>>>> Init finished <<<<<<<<<<<<<<<<<<<<<,");
 
