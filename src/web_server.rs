@@ -1,47 +1,39 @@
-use heapless::{String};
+use heapless::String;
 
+use crate::config::{update_wifi_settings, WifiSettings};
+use crate::DbMutex;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use embassy_sync::watch::{Watch};
+use embassy_sync::watch::Watch;
 use embassy_time::{Duration, Timer};
 use esp_hal::xtensa_lx::_export::critical_section;
 use esp_println::println;
-use picoserve::{AppBuilder, AppRouter};
 use picoserve::extract::Json;
 use picoserve::io::embedded_io_async;
-use picoserve::response::ws;
 use picoserve::response::sse;
+use picoserve::response::ws;
 use picoserve::routing::{get, get_service, post};
+use picoserve::{AppBuilder, AppRouter};
 use static_cell::StaticCell;
-use crate::config::{update_wifi_settings, WifiSettings};
-use crate::DbMutex;
 
 pub const WEB_TASK_POOL_SIZE: usize = 2; // Panic if embassy_executor arena too small
 
-// SSE buffer
 pub type MessageWatch = Watch<CriticalSectionRawMutex, String<128>, 1>;
-// Static storage for the watch channel
 static SSE_MESSAGE_WATCH: StaticCell<MessageWatch> = StaticCell::new();
 
-// Global reference to our watch
 static mut WATCH_REF: Option<&'static MessageWatch> = None;
 
-// Initialize the message watch once at startup
 pub fn init_sse_message_watch() -> &'static MessageWatch {
     let watch = SSE_MESSAGE_WATCH.init(Watch::new());
 
-    // Store a static reference to the watch for later use
-    critical_section::with(|_| {
-        unsafe { WATCH_REF = Some(watch); }
+    critical_section::with(|_| unsafe {
+        WATCH_REF = Some(watch);
     });
 
     watch
 }
 
-
 pub fn get_sse_watch_ref() -> &'static MessageWatch {
-    critical_section::with(|_| {
-        unsafe { WATCH_REF.expect("Message watch not initialized") }
-    })
+    critical_section::with(|_| unsafe { WATCH_REF.expect("Message watch not initialized") })
 }
 
 pub struct SseEvents {}
@@ -56,15 +48,14 @@ pub fn create_sse_events() -> SseEvents {
     SseEvents::new()
 }
 
-
-
-
 pub struct AppProps {
     db: &'static DbMutex,
 }
 
 impl AppProps {
-    pub fn new(db: &'static DbMutex) -> Self { Self { db } }
+    pub fn new(db: &'static DbMutex) -> Self {
+        Self { db }
+    }
 }
 
 impl AppBuilder for AppProps {
@@ -72,19 +63,26 @@ impl AppBuilder for AppProps {
 
     fn build_app(self) -> picoserve::Router<Self::PathRouter> {
         let db = self.db;
-        
+
         picoserve::Router::new()
             .route(
                 "/",
-                get_service(picoserve::response::File::html(include_str!("http/index.html"))),
+                get_service(picoserve::response::File::html(include_str!(
+                    "http/index.html"
+                ))),
             )
             .route(
                 "/index.css",
-                get_service(picoserve::response::File::css(include_str!("http/index.css"))),
+                get_service(picoserve::response::File::css(include_str!(
+                    "http/index.css"
+                ))),
             )
             .route(
                 "/favicon.ico",
-                get_service(picoserve::response::File::with_content_type("image/vnd.microsoft.icon", include_bytes!("http/favicon.ico"))),
+                get_service(picoserve::response::File::with_content_type(
+                    "image/vnd.microsoft.icon",
+                    include_bytes!("http/favicon.ico"),
+                )),
             )
             .route(
                 "/index.js",
@@ -104,18 +102,15 @@ impl AppBuilder for AppProps {
             )
             .route(
                 "/settings",
-                post(move |Json(settings): Json<WifiSettings>| {
-                    async move {
-                        let _ = update_wifi_settings(&settings, db).await;
-                        picoserve::response::DebugValue((
-                            ("hostname", settings.hostname),
-                            ("ssid",     settings.ssid),
-                            ("psw",      settings.psw),
-                        ))
-                    }
+                post(move |Json(settings): Json<WifiSettings>| async move {
+                    let _ = update_wifi_settings(&settings, db).await;
+                    picoserve::response::DebugValue((
+                        ("hostname", settings.hostname),
+                        ("ssid", settings.ssid),
+                        ("psw", settings.psw),
+                    ))
                 }),
             )
-
     }
 }
 
@@ -141,7 +136,7 @@ pub async fn web_task(
         &mut tcp_tx_buffer,
         &mut http_buffer,
     )
-        .await
+    .await
 }
 
 impl sse::EventSource for SseEvents {
@@ -160,29 +155,27 @@ impl sse::EventSource for SseEvents {
         };
         writer.write_event("message_changed", "").await?;
 
-
         loop {
-            // Wait for message changes or timeout after 10 seconds
             match embassy_futures::select::select(
                 receiver.changed(),
-                Timer::after(Duration::from_secs(10))
-            ).await {
+                Timer::after(Duration::from_secs(10)),
+            )
+            .await
+            {
                 embassy_futures::select::Either::First(result) => {
                     if result == "" {
                         println!("SSE Result: {}. its Closed?", result);
-                        // Channel closed
                         break Ok(());
                     } else {
                         println!("SSE Result: {}", result);
                     }
-                    
+
                     let message: String<128> = receiver.get().await;
                     let message_slice: &str = message.as_str();
 
                     writer.write_event("message_changed", message_slice).await?;
-                },
+                }
                 embassy_futures::select::Either::Second(_) => {
-                    // Timeout - send keepalive
                     writer.write_keepalive().await?;
                 }
             }
@@ -190,7 +183,6 @@ impl sse::EventSource for SseEvents {
     }
 }
 
-//WSS
 struct WebsocketEcho;
 
 impl ws::WebSocketCallback for WebsocketEcho {

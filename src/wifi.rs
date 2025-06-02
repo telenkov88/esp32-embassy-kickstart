@@ -1,17 +1,20 @@
 use core::net::Ipv4Addr;
 use core::str::FromStr;
 use core::sync::atomic::Ordering;
-use embassy_executor::{Spawner, task};
-use embassy_net::{Runner, StackResources, Stack, StaticConfigV4, Ipv4Cidr};
+use embassy_executor::{task, Spawner};
+use embassy_net::{Ipv4Cidr, Runner, Stack, StackResources, StaticConfigV4};
 use embassy_time::{Duration, Timer};
 use esp_println::println;
 use esp_wifi::{
     init,
-    wifi::{ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiState, WifiError},
-    EspWifiController,
-    InitializationError
+    wifi::{
+        ClientConfiguration, Configuration, WifiController, WifiDevice, WifiError, WifiEvent,
+        WifiState,
+    },
+    EspWifiController, InitializationError,
 };
 
+use crate::WIFI_MODE_CLIENT;
 use esp_hal::peripherals::RADIO_CLK;
 use esp_hal::peripherals::TIMG0;
 use esp_hal::peripherals::WIFI;
@@ -20,7 +23,6 @@ use esp_hal::timer::timg::TimerGroup;
 use esp_wifi::wifi::AccessPointConfiguration;
 use heapless::String;
 use static_cell::StaticCell;
-use crate::WIFI_MODE_CLIENT;
 
 pub static STACK_RESOURCES: StaticCell<StackResources<20>> = StaticCell::new();
 pub static WIFI_STACK: StaticCell<Stack> = StaticCell::new();
@@ -39,7 +41,6 @@ pub enum WifiMode {
     Sta,
     Ap,
 }
-
 
 #[task]
 async fn run_dhcp(stack: Stack<'static>, gw_ip_addr: &'static str) {
@@ -75,21 +76,22 @@ async fn run_dhcp(stack: Stack<'static>, gw_ip_addr: &'static str) {
             &mut bound_socket,
             &mut buf,
         )
-            .await
-            .inspect_err(|e| println!("DHCP server error: {e:?}"));
+        .await
+        .inspect_err(|e| println!("DHCP server error: {e:?}"));
         Timer::after(Duration::from_millis(500)).await;
     }
 }
 
-
-pub async fn init_wifi(spawner: Spawner,
-                       timer_g0: TimerGroup<TIMG0>,
-                       mut rng: Rng,
-                       wifi: WIFI,
-                       radio_clock_control: RADIO_CLK,
-                       ssid: String<32>,
-                       password: String<64>,
-                       mode: WifiMode,) -> Result<&'static Stack<'static>, Error> {
+pub async fn init_wifi(
+    spawner: Spawner,
+    timer_g0: TimerGroup<TIMG0>,
+    mut rng: Rng,
+    wifi: WIFI,
+    radio_clock_control: RADIO_CLK,
+    ssid: String<32>,
+    password: String<64>,
+    mode: WifiMode,
+) -> Result<&'static Stack<'static>, Error> {
     esp_println::logger::init_logger_from_env();
 
     let esp_wifi_ctrl = &*mk_static!(
@@ -118,27 +120,33 @@ pub async fn init_wifi(spawner: Spawner,
     };
 
     let seed = (rng.random() as u64) << 32 | rng.random() as u64;
-    
+
     let resources = STACK_RESOURCES.init(StackResources::<20>::new());
-    // Init network stack
     let (temp_stack, runner) = embassy_net::new(device, config, resources, seed);
-    // Initialize the global WIFI_STACK.
     let stack = WIFI_STACK.init(temp_stack);
 
     match mode {
         WifiMode::Sta => {
             println!("Connect Sta Mode");
             WIFI_MODE_CLIENT.store(true, Ordering::Release);
-            spawner.spawn(wifi_connection(controller, mode, Some(ssid), Some(password))).ok();
+            spawner
+                .spawn(wifi_connection(
+                    controller,
+                    mode,
+                    Some(ssid),
+                    Some(password),
+                ))
+                .ok();
         }
         WifiMode::Ap => {
             println!("Connect AP Mode");
             WIFI_MODE_CLIENT.store(false, Ordering::Release);
-            spawner.spawn(wifi_connection(controller, mode, None, None)).ok();
+            spawner
+                .spawn(wifi_connection(controller, mode, None, None))
+                .ok();
             spawner.spawn(run_dhcp(*stack, "192.168.1.1")).ok();
         }
     }
-
 
     spawner.spawn(net_task(runner)).ok();
 
@@ -161,7 +169,6 @@ pub async fn init_wifi(spawner: Spawner,
     Ok(stack)
 }
 
-
 #[task]
 async fn wifi_connection(
     mut controller: WifiController<'static>,
@@ -177,7 +184,7 @@ async fn wifi_connection(
     }
 
     loop {
-        let current_mode = &mode; // Take a reference to avoid moving
+        let current_mode = &mode;
 
         match (esp_wifi::wifi::wifi_state(), current_mode) {
             (WifiState::StaConnected, WifiMode::Sta) => {
@@ -193,19 +200,15 @@ async fn wifi_connection(
 
         if !matches!(controller.is_started(), Ok(true)) {
             let config = match current_mode {
-                WifiMode::Sta => {
-                    Configuration::Client(ClientConfiguration {
-                        ssid: ssid.clone().unwrap(),
-                        password: password.clone().unwrap(),
-                        ..Default::default()
-                    })
-                }
-                WifiMode::Ap => {
-                    Configuration::AccessPoint(AccessPointConfiguration {
-                        ssid: "esp-wifi".try_into().unwrap(),
-                        ..Default::default()
-                    })
-                }
+                WifiMode::Sta => Configuration::Client(ClientConfiguration {
+                    ssid: ssid.clone().unwrap(),
+                    password: password.clone().unwrap(),
+                    ..Default::default()
+                }),
+                WifiMode::Ap => Configuration::AccessPoint(AccessPointConfiguration {
+                    ssid: "esp-wifi".try_into().unwrap(),
+                    ..Default::default()
+                }),
             };
 
             controller.set_configuration(&config).unwrap();
@@ -231,7 +234,6 @@ async fn wifi_connection(
 async fn net_task(mut runner: Runner<'static, WifiDevice<'static>>) {
     runner.run().await
 }
-
 
 #[derive(Debug)]
 pub enum Error {

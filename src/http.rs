@@ -1,22 +1,29 @@
 use alloc::boxed::Box;
-use embassy_net::{Stack, tcp::client::{TcpClient}, dns::DnsSocket};
-use embassy_net::tcp::Error as TcpError;
-use embassy_net::tcp::ConnectError as TcpConnectError;
 use embassy_net::dns::Error as DnsError;
+use embassy_net::tcp::ConnectError as TcpConnectError;
+use embassy_net::tcp::Error as TcpError;
+use embassy_net::{dns::DnsSocket, tcp::client::TcpClient, Stack};
+use embassy_time::{with_timeout, Duration, TimeoutError};
 use esp_println::println;
-use embassy_time::{Duration, with_timeout, TimeoutError};
 use heapless::Vec;
-use reqwless::client::{HttpClient};
+use reqwless::client::HttpClient;
 use reqwless::Error as ReqlessError;
 
 const RESPONSE_SIZE: usize = 4096;
 
-pub struct EmbassyHttpClient<'a, 'b, const N: usize, const TX_SZ: usize = 1024, const RX_SZ: usize = 1024> {
+pub struct EmbassyHttpClient<
+    'a,
+    'b,
+    const N: usize,
+    const TX_SZ: usize = 1024,
+    const RX_SZ: usize = 1024,
+> {
     http_client: HttpClient<'a, TcpClient<'b, N, TX_SZ, RX_SZ>, DnsSocket<'b>>,
 }
 
-
-impl<'a, 'b, const N: usize, const TX_SZ: usize, const RX_SZ: usize> EmbassyHttpClient<'a, 'b, N, TX_SZ, RX_SZ> {
+impl<'a, 'b, const N: usize, const TX_SZ: usize, const RX_SZ: usize>
+    EmbassyHttpClient<'a, 'b, N, TX_SZ, RX_SZ>
+{
     pub fn new(stack: &'b Stack<'static>, tcp_client: &'a TcpClient<'b, N, TX_SZ, RX_SZ>) -> Self {
         let dns = DnsSocket::new(*stack);
         let leaked_dns: &'static DnsSocket<'static> = Box::leak(Box::new(dns)); // Allocate on heap
@@ -28,7 +35,9 @@ impl<'a, 'b, const N: usize, const TX_SZ: usize, const RX_SZ: usize> EmbassyHttp
     pub async fn get(&mut self, url: &str, timeout: u64) -> Result<Vec<u8, RESPONSE_SIZE>, Error> {
         let mut buffer = [0; RESPONSE_SIZE];
 
-        let request_future = self.http_client.request(reqwless::request::Method::GET, url);
+        let request_future = self
+            .http_client
+            .request(reqwless::request::Method::GET, url);
         let request_result = with_timeout(Duration::from_secs(timeout), request_future).await;
 
         println!("Sending HTTP request");
@@ -49,7 +58,8 @@ impl<'a, 'b, const N: usize, const TX_SZ: usize, const RX_SZ: usize> EmbassyHttp
 
         let buffer = response.body().read_to_end().await?;
         println!("Read {} bytes", buffer.len());
-        let output = Vec::<u8, RESPONSE_SIZE>::from_slice(buffer).map_err(|()| Error::ResponseTooLarge)?;
+        let output =
+            Vec::<u8, RESPONSE_SIZE>::from_slice(buffer).map_err(|()| Error::ResponseTooLarge)?;
 
         Ok(output)
     }

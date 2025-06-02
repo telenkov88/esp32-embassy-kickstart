@@ -1,11 +1,10 @@
+use crate::{DbMutex, KvDatabase, PASSWORD, SSID};
 use core::fmt;
 use ekv::{CommitError, ReadError, WriteError};
-use serde::{Deserialize, Serialize};
 use esp_println::println;
 use esp_storage::FlashStorageError;
 use heapless::String;
-use crate::{DbMutex, KvDatabase, PASSWORD, SSID};
-
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
 pub struct WifiCredentials {
@@ -15,7 +14,7 @@ pub struct WifiCredentials {
 }
 
 pub async fn get_wifi_credentials(
-    db_mutex: &'static DbMutex
+    db_mutex: &'static DbMutex,
 ) -> Result<WifiCredentials, WifiSettingsError> {
     let (_, ssid) = read_wifi_ssid(db_mutex).await?;
     let (_, password) = read_wifi_password(db_mutex).await?;
@@ -39,8 +38,6 @@ pub fn get_default_credentials() -> WifiCredentials {
         hostname: String::try_from("esp-device").unwrap_or_default(),
     }
 }
-
-
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WifiSettings {
@@ -157,32 +154,25 @@ impl From<ReadError<FlashStorageError>> for DbError {
 
 type DbResult<T> = Result<T, DbError>;
 
-async fn write_db(
-    db: &mut KvDatabase,
-    key: &[u8],
-    value: &[u8],
-) -> DbResult<()> {
+async fn write_db(db: &mut KvDatabase, key: &[u8], value: &[u8]) -> DbResult<()> {
     let mut tx = db.write_transaction().await;
     tx.write(key, value).await?;
     tx.commit().await?;
     Ok(())
 }
 
-async fn read_db(
-    db: &mut KvDatabase,
-    key: &[u8],
-    buf: &mut [u8],
-) -> Result<usize, DbError> {
+async fn read_db(db: &mut KvDatabase, key: &[u8], buf: &mut [u8]) -> Result<usize, DbError> {
     let rtx = db.read_transaction().await;
     Ok(rtx.read(key, buf).await?)
 }
-
 
 pub async fn read_wifi_ssid(db_mutex: &'static DbMutex) -> Result<(usize, String<32>), DbError> {
     read_setting(db_mutex, b"wifi.ssid").await
 }
 
-pub async fn read_wifi_password(db_mutex: &'static DbMutex) -> Result<(usize, String<64>), DbError> {
+pub async fn read_wifi_password(
+    db_mutex: &'static DbMutex,
+) -> Result<(usize, String<64>), DbError> {
     read_setting(db_mutex, b"wifi.password").await
 }
 

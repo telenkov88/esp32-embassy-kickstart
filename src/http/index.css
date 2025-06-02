@@ -4,6 +4,6 @@ body {
     align-items: center;
 }
 
-body>* {
+body > * {
     margin: 1em;
 }
