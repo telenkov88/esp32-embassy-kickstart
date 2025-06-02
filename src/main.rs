@@ -254,6 +254,7 @@ async fn main(spawner: Spawner) {
     let config = make_static!(
         picoserve::Config<Duration>,
         picoserve::Config::new(picoserve::Timeouts {
+            persistent_start_read_request: Some(Duration::from_secs(5)),
             start_read_request: Some(Duration::from_secs(5)),
             read_request: Some(Duration::from_secs(1)),
             write: Some(Duration::from_secs(1)),
