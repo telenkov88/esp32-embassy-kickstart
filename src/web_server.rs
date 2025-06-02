@@ -15,7 +15,7 @@ use picoserve::routing::{get, get_service, post};
 use picoserve::{AppBuilder, AppRouter};
 use static_cell::StaticCell;
 
-pub const WEB_TASK_POOL_SIZE: usize = 2; // Panic if embassy_executor arena too small
+pub const WEB_TASK_POOL_SIZE: usize = 5;
 
 pub type MessageWatch = Watch<CriticalSectionRawMutex, String<128>, 1>;
 static SSE_MESSAGE_WATCH: StaticCell<MessageWatch> = StaticCell::new();

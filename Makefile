@@ -23,7 +23,7 @@ ESPFLASH_ARGS = --chip esp32s3 \
 deps:
 	echo "Installing dependencies"
 	cargo install espup
-	rustup default esp # TODO
+	rustup default esp
 	espup install
 	. $HOME/export-esp.sh
 
@@ -44,6 +44,9 @@ docker-build:
 
 release: clean
 	PASSWORD=${PASSWORD} SSID=${SSID} cargo build --release
+
+stats:
+	xtensa-esp32-elf-size -A target/xtensa-esp32s3-none-elf/release/dual-core
 
 firmware:
 	mkdir -p output

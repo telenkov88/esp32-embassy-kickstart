@@ -28,20 +28,17 @@ embassy-net = { version = "0.7.0", features = [
 esp-alloc = "0.7.0"
 esp-hal = { version = "1.0.0-beta.0", features = ["esp32s3", "unstable"] }
 
-embassy-executor = { version = "0.7.0", features = ["task-arena-size-131072"] }
+embassy-executor = { version = "0.7.0", features = ["nightly"] }
 embassy-time = { version = "0.4.0", features = ["generic-queue-8"] }
 embassy-futures = {version = "0.1.1"}
 esp-hal-embassy = { version = "0.7.0", features = ["esp32s3"] }
 embassy-sync = "0.6.2"
 esp-wifi = { version = "0.13.0", features = [
-  "ble",
   "builtin-scheduler",
-  "coex",
   "esp-alloc",
   "esp32s3",
-  "log",
   "wifi",
-] }
+], default-features = false }
 edge-dhcp = {version = "0.6.0"}
 edge-nal = {version = "0.5.0"}
 edge-nal-embassy = {version = "0.6.0", features = ["proto-ipv4", "udp"], default-features = false}
