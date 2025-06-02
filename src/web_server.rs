@@ -15,7 +15,7 @@ use picoserve::routing::{get, get_service, post};
 use picoserve::{AppBuilder, AppRouter};
 use static_cell::StaticCell;
 
-pub const WEB_TASK_POOL_SIZE: usize = 5;
+pub const WEB_TASK_POOL_SIZE: usize = 6;
 
 pub type MessageWatch = Watch<CriticalSectionRawMutex, String<128>, 1>;
 static SSE_MESSAGE_WATCH: StaticCell<MessageWatch> = StaticCell::new();
@@ -122,9 +122,9 @@ pub async fn web_task(
     config: &'static picoserve::Config<Duration>,
 ) -> ! {
     let port = 80;
-    let mut tcp_rx_buffer = [0; 1024];
-    let mut tcp_tx_buffer = [0; 1024];
-    let mut http_buffer = [0; 2048];
+    let mut tcp_rx_buffer = [0; 512];
+    let mut tcp_tx_buffer = [0; 521];
+    let mut http_buffer = [0; 1024];
 
     picoserve::listen_and_serve(
         id,
@@ -191,7 +191,7 @@ impl ws::WebSocketCallback for WebsocketEcho {
         mut rx: ws::SocketRx<R>,
         mut tx: ws::SocketTx<W>,
     ) -> Result<(), W::Error> {
-        let mut buffer = [0; 1024];
+        let mut buffer = [0; 512];
 
         let close_reason = loop {
             match rx.next_message(&mut buffer).await {

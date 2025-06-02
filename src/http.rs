@@ -9,7 +9,7 @@ use heapless::Vec;
 use reqwless::client::HttpClient;
 use reqwless::Error as ReqlessError;
 
-const RESPONSE_SIZE: usize = 4096;
+const RESPONSE_SIZE: usize = 1024;
 
 pub struct EmbassyHttpClient<
     'a,

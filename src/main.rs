@@ -106,9 +106,9 @@ pub async fn http_wk(
 }
 
 type PhysFlash = FlashStorage;
-type AsyncFlash = BlockingAsync<PhysFlash>; // <- fixes error #1
+type AsyncFlash = BlockingAsync<PhysFlash>;
 type FlashLayer = DbFlash<AsyncFlash>;
-type KvDatabase = ekv::Database<FlashLayer, CriticalSectionRawMutex>; // <- fixes error #2
+type KvDatabase = ekv::Database<FlashLayer, CriticalSectionRawMutex>;
 type DbMutex = Mutex<CriticalSectionRawMutex, KvDatabase>;
 static DB: StaticCell<DbMutex> = StaticCell::new();
 
@@ -125,19 +125,20 @@ async fn main(spawner: Spawner) {
     let peripherals = esp_hal::init(config);
 
     println!("****************** OTA Init ******************");
-    let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
-    run_with_ota(&mut ota_flash, &mut pt_mem, |ota| {
-        let current = ota.current_slot().unwrap();
+    {
+        let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
+        run_with_ota(&mut ota_flash, &mut pt_mem, |ota| {
+            let current = ota.current_slot().unwrap();
 
-        if current != Slot::None {
-            ota.set_current_ota_state(Valid).unwrap();
-        }
-        println!("current OTA image state {:?}", ota.current_ota_state());
-        println!("current OTA {:?} - next {:?}", current, current.next());
+            if current != Slot::None {
+                ota.set_current_ota_state(Valid).unwrap();
+            }
+            println!("current OTA image state {:?}", ota.current_ota_state());
+            println!("current OTA {:?} - next {:?}", current, current.next());
 
-        validate_current_ota_slot(ota);
-    })
-    .unwrap();
+            validate_current_ota_slot(ota);
+        }).unwrap();
+    }
 
     println!("****************** DB Init ******************");
     let flash = FlashStorage::new();

@@ -50,7 +50,7 @@ esp-backtrace = {version = "0.15.1", features = ["esp32s3", "exception-handler",
 picoserve = { version = "0.16.0", features = ["embassy"] }
 serde = { version = "1.0.219", features = ["derive"], default-features = false }
 # HTTP
-reqwless = { version = "0.13", default-features = false, features = ["alloc", "embedded-tls", "log"] }
+reqwless = { version = "0.13", default-features = false, features = [] }
 
 # Neopixel
 esp-hal-smartled = { git = "https://github.com/esp-rs/esp-hal-community", rev = "a613668" }

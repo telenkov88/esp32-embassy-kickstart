@@ -24,7 +24,7 @@ use esp_wifi::wifi::AccessPointConfiguration;
 use heapless::String;
 use static_cell::StaticCell;
 
-pub static STACK_RESOURCES: StaticCell<StackResources<20>> = StaticCell::new();
+pub static STACK_RESOURCES: StaticCell<StackResources<10>> = StaticCell::new();
 pub static WIFI_STACK: StaticCell<Stack> = StaticCell::new();
 
 // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
@@ -111,7 +111,7 @@ pub async fn init_wifi(
             (
                 interfaces.ap,
                 embassy_net::Config::ipv4_static(StaticConfigV4 {
-                    address: Ipv4Cidr::new(gw_ip_addr, 24),
+                    address: Ipv4Cidr::new(gw_ip_addr, 28),
                     gateway: Some(gw_ip_addr),
                     dns_servers: Default::default(),
                 }),
@@ -121,7 +121,7 @@ pub async fn init_wifi(
 
     let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
-    let resources = STACK_RESOURCES.init(StackResources::<20>::new());
+    let resources = STACK_RESOURCES.init(StackResources::<10>::new());
     let (temp_stack, runner) = embassy_net::new(device, config, resources, seed);
     let stack = WIFI_STACK.init(temp_stack);
 
