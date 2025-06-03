@@ -1,8 +1,3 @@
-//! Draft of ESP32S3 project.
-
-//% CHIPS: esp32 esp32s3
-//% FEATURES: embassy esp-hal/unstable
-
 #![no_std]
 #![no_main]
 #![feature(type_alias_impl_trait)]
@@ -27,8 +22,7 @@ use esp_hal::{
 };
 use esp_hal::{rmt::Rmt, time::Rate};
 use esp_hal_embassy::Executor;
-use esp_println::println;
-
+use log::info;
 use static_cell::StaticCell;
 
 mod neopixel;
@@ -59,6 +53,8 @@ use ota::OtaImageState::Valid;
 
 mod config;
 mod db;
+mod log_utils;
+use log_utils::log_banner;
 
 use crate::config::{get_default_credentials, get_wifi_credentials};
 use crate::db::DbFlash;
@@ -99,7 +95,7 @@ pub async fn http_wk(
     name: &'static str,
 ) {
     loop {
-        println!("[{}] Running HTTP client", name);
+        info!("[{}] Running HTTP client", name);
         let _ = http_client.get(url, 2).await;
         Timer::after(Duration::from_millis(period_ms)).await;
     }
@@ -114,17 +110,18 @@ static DB: StaticCell<DbMutex> = StaticCell::new();
 
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
+    esp_println::logger::init_logger_from_env();
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
-    println!("****************** Storage Init ******************");
+    log_banner("Storage Init");
     let mut ota_flash = FlashStorage::new();
-    println!("Flash size = {}", ota_flash.capacity());
+    info!("Flash size = {}", ota_flash.capacity());
 
-    println!("****************** Peripherals Init ******************");
+    log_banner("Peripherals Init");
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    println!("****************** OTA Init ******************");
+    log_banner("OTA Init");
     {
         let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
         run_with_ota(&mut ota_flash, &mut pt_mem, |ota| {
@@ -133,14 +130,15 @@ async fn main(spawner: Spawner) {
             if current != Slot::None {
                 ota.set_current_ota_state(Valid).unwrap();
             }
-            println!("current OTA image state {:?}", ota.current_ota_state());
-            println!("current OTA {:?} - next {:?}", current, current.next());
+            info!("current OTA image state {:?}", ota.current_ota_state());
+            info!("current OTA {:?} - next {:?}", current, current.next());
 
             validate_current_ota_slot(ota);
-        }).unwrap();
+        })
+        .unwrap();
     }
 
-    println!("****************** DB Init ******************");
+    log_banner("DB Init");
     let flash = FlashStorage::new();
     let async_flash = BlockingAsync::new(flash);
     let flash_layer = FlashLayer {
@@ -153,7 +151,7 @@ async fn main(spawner: Spawner) {
     {
         let db = kv_mutex.lock().await;
         if db.mount().await.is_err() {
-            println!("Formatting Persistent EKV Storage...");
+            info!("Formatting Persistent EKV Storage...");
             db.format().await.unwrap();
         }
     }
@@ -171,21 +169,21 @@ async fn main(spawner: Spawner) {
 
         if let Some(s) = ssid {
             if let Ok(text) = core::str::from_utf8(s) {
-                println!("Wi-Fi ssid: {}", text);
+                info!("Wi-Fi ssid: {}", text);
             } else {
-                println!("Wi-Fi ssid (invalid UTF-8): {:?}", s);
+                info!("Wi-Fi ssid (invalid UTF-8): {:?}", s);
             }
         }
     }
 
-    println!("****************** NeoPixel Init ******************");
+    log_banner("NeoPixel init");
     let led_pin = peripherals.GPIO48;
     let freq = Rate::from_mhz(80);
     let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
 
-    println!("****************** Timers Init ******************");
+    log_banner("Timers Init");
     let timer_g0 = TimerGroup::new(peripherals.TIMG0);
     let rng = Rng::new(peripherals.RNG);
     let timer_g1 = TimerGroup::new(peripherals.TIMG1);
@@ -195,7 +193,7 @@ async fn main(spawner: Spawner) {
 
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
-    println!("****************** Led Worker Init ******************");
+    log_banner("Led Worker Init");
     let _guard = cpu_control
         .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {
             static EXECUTOR: StaticCell<Executor> = StaticCell::new();
@@ -207,23 +205,23 @@ async fn main(spawner: Spawner) {
             });
         })
         .unwrap();
-    println!("****************** Led Control Init ******************");
+    log_banner("Led Control Init");
     spawner.spawn(enable_disable_led(led_ctrl_signal)).unwrap();
 
-    println!("****************** Wifi Init ******************");
+    log_banner("Wifi Init");
     let (ssid, password, mode) = match get_wifi_credentials(kv_mutex).await {
         Ok(creds) => {
-            println!("Using stored WiFi credentials");
-            println!("mdns name {}.local", creds.hostname);
+            info!("Using stored WiFi credentials");
+            info!("mdns name {}.local", creds.hostname);
             (creds.ssid, creds.password, WifiMode::Sta)
         }
         Err(_) => {
             let default_creds = get_default_credentials();
             if !default_creds.ssid.is_empty() && default_creds.ssid != "MyDefaultSSID" {
-                println!("Using compile-time WiFi credentials");
+                info!("Using compile-time WiFi credentials");
                 (default_creds.ssid, default_creds.password, WifiMode::Sta)
             } else {
-                println!("No valid credentials, starting in AP mode");
+                info!("No valid credentials, starting in AP mode");
                 (String::new(), String::new(), WifiMode::Ap)
             }
         }
@@ -244,15 +242,15 @@ async fn main(spawner: Spawner) {
 
     WIFI_INITIALIZED.store(true, Ordering::Release);
 
-    println!(">>>>>>>>>>> System Init finished <<<<<<<<<<<<<<<<<<<<<,");
+    log_banner("System Init finished");
 
     let client_state = CLIENT_STATE.init(TcpClientState::new());
     let tcp_client = TCP_CLIENT.init(TcpClient::new(*stack, client_state));
     let http_client = EmbassyHttpClient::new(stack, tcp_client);
 
-    println!(">>>>>>>>>>> HTTP Clients Init finished <<<<<<<<<<<<<<<<<<<<<<<<<<<<,");
+    log_banner("HTTP Clients Init finished");
 
-    println!(">>>> Starting http worker");
+    log_banner("Starting http worker");
     spawner
         .spawn(http_wk(
             http_client,
@@ -262,7 +260,7 @@ async fn main(spawner: Spawner) {
         ))
         .unwrap();
 
-    // Web server worker
+    log_banner("Starting web server");
     let sse_message_watch = web_server::init_sse_message_watch();
     let sse_message_sender = sse_message_watch.sender();
     let app_props = AppProps::new(kv_mutex);
@@ -281,12 +279,10 @@ async fn main(spawner: Spawner) {
         spawner.must_spawn(web_task(id, *stack, app, config));
     }
 
-    // Update SSE the message
     sse_message_sender.clear();
     sse_message_sender.send("Hello SSE!".parse().unwrap());
 
-    println!(">>>>>>>>>>> Init finished <<<<<<<<<<<<<<<<<<<<<,");
-
+    log_banner("All Init finished");
     loop {
         Timer::after(Duration::from_secs(60)).await;
     }

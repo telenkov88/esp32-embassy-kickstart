@@ -6,7 +6,7 @@ use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::watch::Watch;
 use embassy_time::{Duration, Timer};
 use esp_hal::xtensa_lx::_export::critical_section;
-use esp_println::println;
+use log::{info, warn};
 use picoserve::extract::Json;
 use picoserve::io::embedded_io_async;
 use picoserve::response::sse;
@@ -149,7 +149,7 @@ impl sse::EventSource for SseEvents {
             Some(r) => r,
             None => {
                 // Log the error and perhaps return early.
-                println!("Error: The watch channel is closed. Cannot subscribe for events.");
+                info!("Error: The watch channel is closed. Cannot subscribe for events.");
                 return Ok(()); // or handle the failure as appropriate
             }
         };
@@ -164,10 +164,10 @@ impl sse::EventSource for SseEvents {
             {
                 embassy_futures::select::Either::First(result) => {
                     if result == "" {
-                        println!("SSE Result: {}. its Closed?", result);
+                        info!("SSE Result: {}. its Closed?", result);
                         break Ok(());
                     } else {
-                        println!("SSE Result: {}", result);
+                        info!("SSE Result: {}", result);
                     }
 
                     let message: String<128> = receiver.get().await;
@@ -198,13 +198,13 @@ impl ws::WebSocketCallback for WebsocketEcho {
                 Ok(ws::Message::Text(data)) => tx.send_text(data).await,
                 Ok(ws::Message::Binary(data)) => tx.send_binary(data).await,
                 Ok(ws::Message::Close(reason)) => {
-                    println!("Websocket close reason: {reason:?}");
+                    info!("Websocket close reason: {reason:?}");
                     break None;
                 }
                 Ok(ws::Message::Ping(data)) => tx.send_pong(data).await,
                 Ok(ws::Message::Pong(_)) => continue,
                 Err(err) => {
-                    println!("Websocket Error: {err:?}");
+                    warn!("Websocket Error: {err:?}");
 
                     let code = match err {
                         ws::ReadMessageError::Io(err) => return Err(err),

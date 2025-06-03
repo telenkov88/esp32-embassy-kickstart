@@ -265,6 +265,7 @@ dependencies = [
  "esp-storage",
  "esp-wifi",
  "heapless",
+ "log",
  "picoserve",
  "reqwless",
  "serde",

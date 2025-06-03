@@ -48,6 +48,10 @@ release: clean
 stats:
 	xtensa-esp32-elf-size -A target/xtensa-esp32s3-none-elf/release/dual-core
 
+dram-usage:
+	cargo bloat --release --crates
+	cargo bloat --release --functions
+
 firmware:
 	mkdir -p output
 	espflash save-image ${ESPFLASH_ARGS} output/firmware.bin

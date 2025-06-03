@@ -1,7 +1,7 @@
 use crate::{DbMutex, KvDatabase, PASSWORD, SSID};
 use core::fmt;
 use ekv::{CommitError, ReadError, WriteError};
-use esp_println::println;
+use log::{info, error};
 use esp_storage::FlashStorageError;
 use heapless::String;
 use serde::{Deserialize, Serialize};
@@ -71,10 +71,10 @@ pub async fn update_wifi_settings(
     settings: &WifiSettings,
     db_mutex: &'static DbMutex,
 ) -> Result<bool, WifiSettingsError> {
-    println!("Received new Wi-Fi settings:");
-    println!("  • Hostname: {}", settings.hostname);
-    println!("  • SSID:     {}", settings.ssid);
-    println!("  • Password: {}", settings.psw);
+    info!("Received new Wi-Fi settings:");
+    info!("  • Hostname: {}", settings.hostname);
+    info!("  • SSID:     {}", settings.ssid);
+    info!("  • Password: {}", settings.psw);
 
     {
         let mut db = db_mutex.lock().await;
@@ -91,9 +91,9 @@ pub async fn update_wifi_settings(
     let verified = len == settings.ssid.len() && ssid.as_bytes() == settings.ssid.as_bytes();
 
     if verified {
-        println!("✅  Wi-Fi settings saved and SSID verified.");
+        info!("✅  Wi-Fi settings saved and SSID verified.");
     } else {
-        println!("⚠️  SSID verification FAILED!");
+        error!("⚠️  SSID verification FAILED!");
     }
 
     Ok(verified)
@@ -110,7 +110,7 @@ pub async fn read_setting<const N: usize>(
     let mut setting = String::new();
     for &b in &buf[..n] {
         if setting.push(b as char).is_err() {
-            println!("Truncation occurred for key {:?}", key);
+            error!("Truncation occurred for key {:?}", key);
             break;
         }
     }

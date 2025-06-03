@@ -7,7 +7,7 @@ use esp_hal::gpio::GpioPin;
 use esp_hal::rmt::Rmt;
 use esp_hal::system::Cpu;
 use esp_hal_smartled::smartLedBuffer;
-use esp_println::println;
+use log::info;
 
 const GPIONUM: u8 = 48;
 
@@ -17,7 +17,7 @@ pub async fn control_led(
     rmt: Rmt<'static, esp_hal::Blocking>,
     control: &'static Signal<CriticalSectionRawMutex, bool>,
 ) {
-    println!("Starting control_led() on core {}", Cpu::current() as usize);
+    info!("Starting control_led() on core {}", Cpu::current() as usize);
     let rmt_buffer = smartLedBuffer!(1);
     let channel = rmt.channel0;
     let mut smart_led = NeoPixel::new(channel, led, rmt_buffer);

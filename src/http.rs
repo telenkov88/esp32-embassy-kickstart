@@ -4,7 +4,7 @@ use embassy_net::tcp::ConnectError as TcpConnectError;
 use embassy_net::tcp::Error as TcpError;
 use embassy_net::{dns::DnsSocket, tcp::client::TcpClient, Stack};
 use embassy_time::{with_timeout, Duration, TimeoutError};
-use esp_println::println;
+use log::{info, warn};
 use heapless::Vec;
 use reqwless::client::HttpClient;
 use reqwless::Error as ReqlessError;
@@ -40,24 +40,24 @@ impl<'a, 'b, const N: usize, const TX_SZ: usize, const RX_SZ: usize>
             .request(reqwless::request::Method::GET, url);
         let request_result = with_timeout(Duration::from_secs(timeout), request_future).await;
 
-        println!("Sending HTTP request");
+        info!("Sending HTTP request");
         let mut request = match request_result {
             Ok(Ok(req)) => req,
             Ok(Err(e)) => {
-                println!("Error creating request: {:?}", e);
+                info!("Error creating request: {:?}", e);
                 return Err(Error::from(e));
             }
             Err(_) => {
-                println!("Timeout out creating HTTP request!");
+                warn!("Timeout out creating HTTP request!");
                 return Err(Error::from(TimeoutError));
             }
         };
 
         let response = request.send(&mut buffer).await?;
-        println!("HTTP status: {:?}", response.status);
+        info!("HTTP status: {:?}", response.status);
 
         let buffer = response.body().read_to_end().await?;
-        println!("Read {} bytes", buffer.len());
+        info!("Read {} bytes", buffer.len());
         let output =
             Vec::<u8, RESPONSE_SIZE>::from_slice(buffer).map_err(|()| Error::ResponseTooLarge)?;
 

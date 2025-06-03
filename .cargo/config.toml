@@ -2,6 +2,7 @@
 runner = "espflash flash --partition-table=./partitions.csv -s 16mb --monitor --chip esp32s3 -B 921600"
 
 [env]
+ESP_LOG="INFO"
 
 [build]
 rustflags = [
