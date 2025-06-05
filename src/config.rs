@@ -31,13 +31,21 @@ pub async fn get_wifi_credentials(
     }
 }
 
-pub fn get_default_credentials() -> WifiCredentials {
-    WifiCredentials {
-        ssid: String::try_from(SSID).unwrap_or_default(),
-        password: String::try_from(PASSWORD).unwrap_or_default(),
-        hostname: String::try_from("esp-device").unwrap_or_default(),
-    }
+#[derive(Debug)]
+pub enum CredError {
+    SsidTooLong,
+    PasswordTooLong,
+    HostnameTooLong,
 }
+
+pub fn get_default_credentials() -> Result<WifiCredentials, CredError> {
+    Ok(WifiCredentials {
+        ssid: String::try_from(SSID).map_err(|_| CredError::SsidTooLong)?,
+        password: String::try_from(PASSWORD).map_err(|_| CredError::PasswordTooLong)?,
+        hostname: String::try_from("esp-device").map_err(|_| CredError::HostnameTooLong)?,
+    })
+}
+
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WifiSettings {

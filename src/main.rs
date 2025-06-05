@@ -122,7 +122,7 @@ async fn main(spawner: Spawner) {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
     info!("CPU {:>3} MHz", config.cpu_clock().mhz());
-    
+
 
     log_banner("OTA Init");
     {
@@ -214,20 +214,24 @@ async fn main(spawner: Spawner) {
     log_banner("Wifi Init");
     let (ssid, password, mode) = match get_wifi_credentials(kv_mutex).await {
         Ok(creds) => {
-            info!("Using stored WiFi credentials");
-            info!("mdns name {}.local", creds.hostname);
+            info!("Using stored Wi-Fi credentials");
+            info!("mDNS name {}.local", creds.hostname);
             (creds.ssid, creds.password, WifiMode::Sta)
         }
-        Err(_) => {
-            let default_creds = get_default_credentials();
-            if !default_creds.ssid.is_empty() && default_creds.ssid != "MyDefaultSSID" {
-                info!("Using compile-time WiFi credentials");
-                (default_creds.ssid, default_creds.password, WifiMode::Sta)
-            } else {
+        Err(_) => match get_default_credentials() {
+            Ok(default_creds)
+            if !default_creds.ssid.is_empty()
+                && default_creds.ssid != "MyDefaultSSID" =>
+                {
+                    info!("Using compile-time Wi-Fi credentials");
+                    info!("mDNS name {}.local", default_creds.hostname);
+                    (default_creds.ssid, default_creds.password, WifiMode::Sta)
+                }
+            _ => {
                 info!("No valid credentials, starting in AP mode");
                 (String::new(), String::new(), WifiMode::Ap)
             }
-        }
+        },
     };
 
     let stack = connect_to_wifi(
