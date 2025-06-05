@@ -1,5 +1,5 @@
 use crate::neopixel::NeoPixel;
-use crate::{FIRMWARE_UPGRADE_IN_PROGRESS, WIFI_INITIALIZED, WIFI_MODE_CLIENT};
+use crate::{FIRMWARE_UPGRADE_IN_PROGRESS, WIFI_INITIALIZED, WIFI_MODE_CLIENT, try_log};
 use core::sync::atomic::Ordering;
 use embassy_executor::task;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
@@ -22,14 +22,6 @@ pub async fn control_led(
     let rmt_buffer = smartLedBuffer!(1);
     let channel = rmt.channel0;
     let mut smart_led = NeoPixel::new(channel, led, rmt_buffer);
-
-    macro_rules! try_log {
-        ($expr:expr, $context:literal) => {
-            if let Err(e) = $expr {
-                error!(concat!("NeoPixel error (", $context, "): {:?}"), e);
-            }
-        };
-    }
 
     // Initial LED state -------------------------------------------------------
     try_log!(smart_led.set_brightness(0), "set_brightness(0)");

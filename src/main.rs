@@ -10,7 +10,7 @@ use core::ptr::addr_of_mut;
 use core::sync::atomic::{AtomicBool, Ordering};
 use embassy_executor::{Spawner, task};
 use embassy_net::tcp::client::{TcpClient, TcpClientState};
-use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex, signal::Signal};
 use embassy_time::{Duration, Timer};
 #[allow(unused_imports)]
 use esp_backtrace as _;
@@ -22,18 +22,16 @@ use esp_hal::{
 };
 use esp_hal::{rmt::Rmt, time::Rate};
 use esp_hal_embassy::Executor;
-use log::info;
+use log::{error, info};
 use static_cell::StaticCell;
-
-mod neopixel;
 
 mod http;
 mod main_core;
+mod neopixel;
 mod second_core;
-mod wifi;
-
 mod shared;
 mod web_server;
+mod wifi;
 
 use crate::http::EmbassyHttpClient;
 use main_core::enable_disable_led;
@@ -54,13 +52,14 @@ use ota::OtaImageState::Valid;
 mod config;
 mod db;
 mod log_utils;
+mod macros;
+
 use log_utils::log_banner;
 
 use crate::config::{get_default_credentials, get_wifi_credentials};
 use crate::db::DbFlash;
 use crate::wifi::WifiMode;
 use embassy_embedded_hal::adapter::BlockingAsync;
-use embassy_sync::mutex::Mutex;
 use esp_hal::clock::Clock;
 use heapless::String;
 
@@ -126,18 +125,21 @@ async fn main(spawner: Spawner) {
     log_banner("OTA Init");
     {
         let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
-        run_with_ota(&mut ota_flash, &mut pt_mem, |ota| {
-            let current = ota.current_slot().unwrap();
-
-            if current != Slot::None {
-                ota.set_current_ota_state(Valid).unwrap();
-            }
-            info!("current OTA image state {:?}", ota.current_ota_state());
-            info!("current OTA {:?} - next {:?}", current, current.next());
-
-            validate_current_ota_slot(ota);
-        })
-        .unwrap();
+        let ota_result = run_with_ota(
+            &mut ota_flash,
+            &mut pt_mem,
+            |ota| -> Result<(), ota::Error> {
+                let current = ota.current_slot()?;
+                if current != Slot::None {
+                    ota.set_current_ota_state(Valid)?;
+                }
+                info!("current OTA image state {:?}", ota.current_ota_state()?);
+                info!("current OTA {:?} → next {:?}", current, current.next());
+                validate_current_ota_slot(ota)?;
+                Ok(())
+            },
+        );
+        try_log!(ota_result, "OTA init/validation failed");
     }
 
     log_banner("DB Init");
@@ -154,26 +156,23 @@ async fn main(spawner: Spawner) {
         let db = kv_mutex.lock().await;
         if db.mount().await.is_err() {
             info!("Formatting Persistent EKV Storage...");
-            db.format().await.unwrap();
+            try_log!(db.format().await, "EKV format failed");
         }
     }
 
     {
         let db = kv_mutex.lock().await;
         let mut buf = [0u8; 32];
-        let ssid = db
+        if let Ok(n) = db
             .read_transaction()
             .await
             .read(b"wifi.ssid", &mut buf)
             .await
-            .map(|n| &buf[..n])
-            .ok();
-
-        if let Some(s) = ssid {
-            if let Ok(text) = core::str::from_utf8(s) {
-                info!("Wi-Fi ssid: {}", text);
-            } else {
-                info!("Wi-Fi ssid (invalid UTF-8): {:?}", s);
+        {
+            let s = &buf[..n];
+            match core::str::from_utf8(s) {
+                Ok(text) => info!("Wi‑Fi ssid: {}", text),
+                Err(_) => info!("Wi‑Fi ssid (invalid UTF‑8): {:?}", s),
             }
         }
     }
@@ -181,7 +180,16 @@ async fn main(spawner: Spawner) {
     log_banner("NeoPixel init");
     let led_pin = peripherals.GPIO48;
     let freq = Rate::from_mhz(80);
-    let rmt = Rmt::new(peripherals.RMT, freq).unwrap();
+    let rmt = match Rmt::new(peripherals.RMT, freq) {
+        Ok(r) => r,
+        Err(e) => {
+            error!("RMT init failed: {:?}", e);
+            loop {
+                Timer::after(Duration::from_secs(60)).await;
+            }
+        }
+    };
+
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
 
@@ -196,19 +204,26 @@ async fn main(spawner: Spawner) {
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
     log_banner("Led Worker Init");
-    let _guard = cpu_control
-        .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {
+    if let Err(e) =
+        cpu_control.start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {
             static EXECUTOR: StaticCell<Executor> = StaticCell::new();
             let executor = EXECUTOR.init(Executor::new());
             executor.run(|spawner| {
-                spawner
-                    .spawn(control_led(led_pin, rmt, led_ctrl_signal))
-                    .ok();
+                try_log!(
+                    spawner.spawn(control_led(led_pin, rmt, led_ctrl_signal)),
+                    "spawn(control_led)"
+                );
             });
         })
-        .unwrap();
+    {
+        error!("Failed to start app core: {:?}", e);
+    }
+
     log_banner("Led Control Init");
-    spawner.spawn(enable_disable_led(led_ctrl_signal)).unwrap();
+    try_log!(
+        spawner.spawn(enable_disable_led(led_ctrl_signal)),
+        "spawn(enable_disable_led)"
+    );
 
     log_banner("Wifi Init");
     let (ssid, password, mode) = match get_wifi_credentials(kv_mutex).await {
@@ -232,7 +247,7 @@ async fn main(spawner: Spawner) {
         },
     };
 
-    let stack = init_wifi(
+    let stack = match init_wifi(
         spawner,
         timer_g0,
         rng,
@@ -243,10 +258,17 @@ async fn main(spawner: Spawner) {
         mode,
     )
     .await
-    .unwrap();
+    {
+        Ok(s) => s,
+        Err(e) => {
+            error!("Wi‑Fi init failed: {:?}", e);
+            loop {
+                Timer::after(Duration::from_secs(60)).await;
+            }
+        }
+    };
 
     WIFI_INITIALIZED.store(true, Ordering::Release);
-
     log_banner("System Init finished");
 
     let client_state = CLIENT_STATE.init(TcpClientState::new());
@@ -256,14 +278,15 @@ async fn main(spawner: Spawner) {
     log_banner("HTTP Clients Init finished");
 
     log_banner("Starting http worker");
-    spawner
-        .spawn(http_wk(
+    try_log!(
+        spawner.spawn(http_wk(
             http_client,
             "http://mobile-j.de",
-            120000,
-            "client1",
-        ))
-        .unwrap();
+            120_000,
+            "client1"
+        )),
+        "spawn(http_wk)"
+    );
 
     log_banner("Starting web server");
     let sse_message_watch = web_server::init_sse_message_watch();
@@ -285,7 +308,11 @@ async fn main(spawner: Spawner) {
     }
 
     sse_message_sender.clear();
-    sse_message_sender.send("Hello SSE!".parse().unwrap());
+    if let Ok(msg) = "Hello SSE!".parse() {
+        sse_message_sender.send(msg);
+    } else {
+        error!("Failed to parse initial SSE message");
+    }
 
     log_banner("All Init finished");
     loop {
