@@ -8,7 +8,7 @@ extern crate alloc;
 use crate::ota::{run_with_ota, validate_current_ota_slot};
 use core::ptr::addr_of_mut;
 use core::sync::atomic::{AtomicBool, Ordering};
-use embassy_executor::{task, Spawner};
+use embassy_executor::{Spawner, task};
 use embassy_net::tcp::client::{TcpClient, TcpClientState};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use embassy_time::{Duration, Timer};
@@ -18,7 +18,7 @@ use esp_hal::rng::Rng;
 use esp_hal::{
     clock::CpuClock,
     system::{CpuControl, Stack},
-    timer::{timg::TimerGroup, AnyTimer},
+    timer::{AnyTimer, timg::TimerGroup},
 };
 use esp_hal::{rmt::Rmt, time::Rate};
 use esp_hal_embassy::Executor;
@@ -38,10 +38,10 @@ mod web_server;
 use crate::http::EmbassyHttpClient;
 use main_core::enable_disable_led;
 use second_core::control_led;
-use wifi::init_wifi as connect_to_wifi;
+use wifi::init_wifi;
 
 use crate::web_server::AppProps;
-use picoserve::{make_static, AppBuilder, AppRouter};
+use picoserve::{AppBuilder, AppRouter, make_static};
 use web_server::web_task;
 
 mod ota;
@@ -78,7 +78,7 @@ pub static FIRMWARE_UPGRADE_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
 const fn or_str(opt: Option<&'static str>, default: &'static str) -> &'static str {
     if let Some(val) = opt {
         val
-    } else if let None = opt {
+    } else if opt.is_none() {
         default
     } else {
         unreachable!()
@@ -122,7 +122,6 @@ async fn main(spawner: Spawner) {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
     info!("CPU {:>3} MHz", config.cpu_clock().mhz());
-
 
     log_banner("OTA Init");
     {
@@ -220,13 +219,12 @@ async fn main(spawner: Spawner) {
         }
         Err(_) => match get_default_credentials() {
             Ok(default_creds)
-            if !default_creds.ssid.is_empty()
-                && default_creds.ssid != "MyDefaultSSID" =>
-                {
-                    info!("Using compile-time Wi-Fi credentials");
-                    info!("mDNS name {}.local", default_creds.hostname);
-                    (default_creds.ssid, default_creds.password, WifiMode::Sta)
-                }
+                if !default_creds.ssid.is_empty() && default_creds.ssid != "MyDefaultSSID" =>
+            {
+                info!("Using compile-time Wi-Fi credentials");
+                info!("mDNS name {}.local", default_creds.hostname);
+                (default_creds.ssid, default_creds.password, WifiMode::Sta)
+            }
             _ => {
                 info!("No valid credentials, starting in AP mode");
                 (String::new(), String::new(), WifiMode::Ap)
@@ -234,7 +232,7 @@ async fn main(spawner: Spawner) {
         },
     };
 
-    let stack = connect_to_wifi(
+    let stack = init_wifi(
         spawner,
         timer_g0,
         rng,

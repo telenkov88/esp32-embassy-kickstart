@@ -1,7 +1,7 @@
 use heapless::String;
 
-use crate::config::{update_wifi_settings, WifiSettings};
 use crate::DbMutex;
+use crate::config::{WifiSettings, update_wifi_settings};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::watch::Watch;
 use embassy_time::{Duration, Timer};
@@ -163,7 +163,7 @@ impl sse::EventSource for SseEvents {
             .await
             {
                 embassy_futures::select::Either::First(result) => {
-                    if result == "" {
+                    if result.is_empty() {
                         info!("SSE Result: {}. its Closed?", result);
                         break Ok(());
                     } else {

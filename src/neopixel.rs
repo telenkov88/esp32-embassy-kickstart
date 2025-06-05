@@ -2,9 +2,9 @@ use esp_hal::gpio::OutputPin;
 use esp_hal::peripheral::Peripheral;
 use esp_hal::rmt::{TxChannel, TxChannelCreator};
 use esp_hal_smartled::SmartLedsAdapter;
-use smart_leds::hsv::hsv2rgb;
 use smart_leds::RGB8;
-use smart_leds::{brightness, gamma, hsv::Hsv, SmartLedsWrite};
+use smart_leds::hsv::hsv2rgb;
+use smart_leds::{SmartLedsWrite, brightness, gamma, hsv::Hsv};
 
 pub trait NeoPixelChannelCreator<'d, ChannelType: TxChannel, Pin: OutputPin>:
     TxChannelCreator<'d, ChannelType, Pin>

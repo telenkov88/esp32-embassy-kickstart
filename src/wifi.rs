@@ -1,18 +1,17 @@
 use core::net::Ipv4Addr;
 use core::str::FromStr;
 use core::sync::atomic::Ordering;
-use embassy_executor::{task, Spawner};
+use embassy_executor::{Spawner, task};
 use embassy_net::{Ipv4Cidr, Runner, Stack, StackResources, StaticConfigV4};
 use embassy_time::{Duration, Timer};
-use log::{info, error};
 use esp_wifi::{
-    init,
+    EspWifiController, InitializationError, init,
     wifi::{
         ClientConfiguration, Configuration, WifiController, WifiDevice, WifiError, WifiEvent,
         WifiState,
     },
-    EspWifiController, InitializationError,
 };
+use log::{error, info};
 
 use crate::WIFI_MODE_CLIENT;
 use esp_hal::peripherals::RADIO_CLK;
@@ -88,7 +87,7 @@ async fn run_dhcp(stack: Stack<'static>, gw_ip_addr: &'static str) {
             &mut bound_socket,
             &mut buf,
         )
-            .await
+        .await
         {
             error!("DHCP server error: {e:?}");
         }
@@ -96,6 +95,7 @@ async fn run_dhcp(stack: Stack<'static>, gw_ip_addr: &'static str) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn init_wifi(
     spawner: Spawner,
     timer_g0: TimerGroup<TIMG0>,
@@ -108,10 +108,10 @@ pub async fn init_wifi(
 ) -> Result<&'static Stack<'static>, Error> {
     let esp_wifi_ctrl = &*mk_static!(
         EspWifiController<'static>,
-        init(timer_g0.timer0, rng.clone(), radio_clock_control)?
+        init(timer_g0.timer0, rng, radio_clock_control)?
     );
 
-    let (controller, interfaces) = esp_wifi::wifi::new(&esp_wifi_ctrl, wifi)?;
+    let (controller, interfaces) = esp_wifi::wifi::new(esp_wifi_ctrl, wifi)?;
 
     let (device, config) = match mode {
         WifiMode::Sta => (

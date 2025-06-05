@@ -2,12 +2,12 @@ use alloc::boxed::Box;
 use embassy_net::dns::Error as DnsError;
 use embassy_net::tcp::ConnectError as TcpConnectError;
 use embassy_net::tcp::Error as TcpError;
-use embassy_net::{dns::DnsSocket, tcp::client::TcpClient, Stack};
-use embassy_time::{with_timeout, Duration, TimeoutError};
-use log::{info, warn};
+use embassy_net::{Stack, dns::DnsSocket, tcp::client::TcpClient};
+use embassy_time::{Duration, TimeoutError, with_timeout};
 use heapless::Vec;
-use reqwless::client::HttpClient;
+use log::{info, warn};
 use reqwless::Error as ReqlessError;
+use reqwless::client::HttpClient;
 
 const RESPONSE_SIZE: usize = 1024;
 

@@ -2,7 +2,7 @@ use embassy_executor::task;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use embassy_time::{Duration, Ticker};
 use esp_hal::system::Cpu;
-use log::{info};
+use log::info;
 
 #[task]
 pub async fn enable_disable_led(

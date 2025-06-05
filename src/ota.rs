@@ -2,8 +2,8 @@ pub(crate) use esp_bootloader_esp_idf::ota::{Ota, OtaImageState, Slot};
 use esp_bootloader_esp_idf::partitions::{
     self, AppPartitionSubType, DataPartitionSubType, PartitionTable, PartitionType,
 };
-use log::{info, error};
 use esp_storage::FlashStorage;
+use log::{error, info};
 
 pub fn run_with_ota<F, R>(
     flash_storage: &mut FlashStorage,

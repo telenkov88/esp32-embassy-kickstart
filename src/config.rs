@@ -1,9 +1,9 @@
 use crate::{DbMutex, KvDatabase, PASSWORD, SSID};
 use core::fmt;
 use ekv::{CommitError, ReadError, WriteError};
-use log::{info, error};
 use esp_storage::FlashStorageError;
 use heapless::String;
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
@@ -32,20 +32,19 @@ pub async fn get_wifi_credentials(
 }
 
 #[derive(Debug)]
-pub enum CredError {
-    SsidTooLong,
-    PasswordTooLong,
-    HostnameTooLong,
+pub enum CredTooLongError {
+    Ssid,
+    Password,
+    Hostname,
 }
 
-pub fn get_default_credentials() -> Result<WifiCredentials, CredError> {
+pub fn get_default_credentials() -> Result<WifiCredentials, CredTooLongError> {
     Ok(WifiCredentials {
-        ssid: String::try_from(SSID).map_err(|_| CredError::SsidTooLong)?,
-        password: String::try_from(PASSWORD).map_err(|_| CredError::PasswordTooLong)?,
-        hostname: String::try_from("esp-device").map_err(|_| CredError::HostnameTooLong)?,
+        ssid: String::try_from(SSID).map_err(|_| CredTooLongError::Ssid)?,
+        password: String::try_from(PASSWORD).map_err(|_| CredTooLongError::Password)?,
+        hostname: String::try_from("esp-device").map_err(|_| CredTooLongError::Hostname)?,
     })
 }
-
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WifiSettings {
