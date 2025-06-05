@@ -10,38 +10,38 @@
 </head>
 
 <body>
-    <div class="tab-pane fade container active show" id="wifitab" role="tabpanel">
-        <h2>Wifi settings</h2>
-        <label for="hostName">Hostname:</label>
-        <input type="text" style="width: 300px" id="hostName" name="hostName" pattern="[a-zA-Z0-9\-\.]{1,15}"
-               value="esp32-e"
-               title="Hostname must be 1-15 characters long and contain only letters, numbers, hyphens">
+<div class="tab-pane fade container active show" id="wifitab" role="tabpanel">
+    <h2>Wifi settings</h2>
+    <label for="hostName">Hostname:</label>
+    <input type="text" style="width: 300px" id="hostName" name="hostName" pattern="[a-zA-Z0-9\-\.]{1,15}"
+           value="esp32-e"
+           title="Hostname must be 1-15 characters long and contain only letters, numbers, hyphens">
 
-        <!-- Form for wi-fi settings -->
-        <p>
+    <!-- Form for wi-fi settings -->
+    <p>
         <label for="ssidInput">SSID Name:</label>
         <input type="text" style="width: 300px" class="form-control" id="ssidInput" placeholder="Enter SSID name">
-        <p>
+    <p>
         <label for="password" class="form-label mt-2">WI-FI password:</label>
         <input type="password" id="password" name="password" class="form-control rounded"
                autocomplete="password"
                spellcheck="false" autocapitalize="off" required
                placeholder="Enter Wifi password">
-        <div>
-            <button type="button" style="background-color: palegreen;" disabled id="uploadDataBtn">Apply</button>
-        </div>
-
-    </div>
-
     <div>
-        Messages sent will be echoed back to the client
+        <button type="button" style="background-color: palegreen;" disabled id="uploadDataBtn">Apply</button>
     </div>
-    <label title="Input for wss">
-        <input type="text">
-    </label>
-    <button type="button">Send</button>
-    <ul id="output"></ul>
-    <ul id="sseOutput"></ul>
+
+</div>
+
+<div>
+    Messages sent will be echoed back to the client
+</div>
+<label title="Input for wss">
+    <input type="text">
+</label>
+<button type="button">Send</button>
+<ul id="output"></ul>
+<ul id="sseOutput"></ul>
 </body>
 
 </html>

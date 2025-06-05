@@ -1,11 +1,10 @@
+use crate::{DbMutex, KvDatabase, PASSWORD, SSID};
 use core::fmt;
 use ekv::{CommitError, ReadError, WriteError};
-use serde::{Deserialize, Serialize};
-use esp_println::println;
 use esp_storage::FlashStorageError;
 use heapless::String;
-use crate::{DbMutex, KvDatabase, PASSWORD, SSID};
-
+use log::{error, info};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
 pub struct WifiCredentials {
@@ -15,7 +14,7 @@ pub struct WifiCredentials {
 }
 
 pub async fn get_wifi_credentials(
-    db_mutex: &'static DbMutex
+    db_mutex: &'static DbMutex,
 ) -> Result<WifiCredentials, WifiSettingsError> {
     let (_, ssid) = read_wifi_ssid(db_mutex).await?;
     let (_, password) = read_wifi_password(db_mutex).await?;
@@ -32,15 +31,20 @@ pub async fn get_wifi_credentials(
     }
 }
 
-pub fn get_default_credentials() -> WifiCredentials {
-    WifiCredentials {
-        ssid: String::try_from(SSID).unwrap_or_default(),
-        password: String::try_from(PASSWORD).unwrap_or_default(),
-        hostname: String::try_from("esp-device").unwrap_or_default(),
-    }
+#[derive(Debug)]
+pub enum CredTooLongError {
+    Ssid,
+    Password,
+    Hostname,
 }
 
-
+pub fn get_default_credentials() -> Result<WifiCredentials, CredTooLongError> {
+    Ok(WifiCredentials {
+        ssid: String::try_from(SSID).map_err(|_| CredTooLongError::Ssid)?,
+        password: String::try_from(PASSWORD).map_err(|_| CredTooLongError::Password)?,
+        hostname: String::try_from("esp-device").map_err(|_| CredTooLongError::Hostname)?,
+    })
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WifiSettings {
@@ -74,10 +78,10 @@ pub async fn update_wifi_settings(
     settings: &WifiSettings,
     db_mutex: &'static DbMutex,
 ) -> Result<bool, WifiSettingsError> {
-    println!("Received new Wi-Fi settings:");
-    println!("  • Hostname: {}", settings.hostname);
-    println!("  • SSID:     {}", settings.ssid);
-    println!("  • Password: {}", settings.psw);
+    info!("Received new Wi-Fi settings:");
+    info!("  • Hostname: {}", settings.hostname);
+    info!("  • SSID:     {}", settings.ssid);
+    info!("  • Password: {}", settings.psw);
 
     {
         let mut db = db_mutex.lock().await;
@@ -94,9 +98,9 @@ pub async fn update_wifi_settings(
     let verified = len == settings.ssid.len() && ssid.as_bytes() == settings.ssid.as_bytes();
 
     if verified {
-        println!("✅  Wi-Fi settings saved and SSID verified.");
+        info!("✅  Wi-Fi settings saved and SSID verified.");
     } else {
-        println!("⚠️  SSID verification FAILED!");
+        error!("⚠️  SSID verification FAILED!");
     }
 
     Ok(verified)
@@ -113,7 +117,7 @@ pub async fn read_setting<const N: usize>(
     let mut setting = String::new();
     for &b in &buf[..n] {
         if setting.push(b as char).is_err() {
-            println!("Truncation occurred for key {:?}", key);
+            error!("Truncation occurred for key {:?}", key);
             break;
         }
     }
@@ -157,32 +161,25 @@ impl From<ReadError<FlashStorageError>> for DbError {
 
 type DbResult<T> = Result<T, DbError>;
 
-async fn write_db(
-    db: &mut KvDatabase,
-    key: &[u8],
-    value: &[u8],
-) -> DbResult<()> {
+async fn write_db(db: &mut KvDatabase, key: &[u8], value: &[u8]) -> DbResult<()> {
     let mut tx = db.write_transaction().await;
     tx.write(key, value).await?;
     tx.commit().await?;
     Ok(())
 }
 
-async fn read_db(
-    db: &mut KvDatabase,
-    key: &[u8],
-    buf: &mut [u8],
-) -> Result<usize, DbError> {
+async fn read_db(db: &mut KvDatabase, key: &[u8], buf: &mut [u8]) -> Result<usize, DbError> {
     let rtx = db.read_transaction().await;
     Ok(rtx.read(key, buf).await?)
 }
-
 
 pub async fn read_wifi_ssid(db_mutex: &'static DbMutex) -> Result<(usize, String<32>), DbError> {
     read_setting(db_mutex, b"wifi.ssid").await
 }
 
-pub async fn read_wifi_password(db_mutex: &'static DbMutex) -> Result<(usize, String<64>), DbError> {
+pub async fn read_wifi_password(
+    db_mutex: &'static DbMutex,
+) -> Result<(usize, String<64>), DbError> {
     read_setting(db_mutex, b"wifi.password").await
 }
 

@@ -18,12 +18,12 @@ DOCKER_ARGS = -it --rm \
 ESPFLASH_ARGS = --chip esp32s3 \
               --partition-table=./partitions.csv \
               -s 16mb \
-              target/xtensa-esp32s3-none-elf/release/dual-core
+              target/xtensa-esp32s3-none-elf/release/firmware
 
 deps:
 	echo "Installing dependencies"
 	cargo install espup
-	rustup default esp # TODO
+	rustup default esp
 	espup install
 	. $HOME/export-esp.sh
 
@@ -34,16 +34,26 @@ clean:
 build:
 	PASSWORD=${PASSWORD} SSID=${SSID} cargo build
 
+lint:
+	cargo clippy --workspace --release
+
 docker:
 	docker buildx build -f dockerfiles/Dockerfile --progress=plain --load -t ${DOCKER_IMG} .
 
 docker-build:
 	mkdir -p -m 777 output
-	rm -rf output/firmware.bin
-	docker run ${DOCKER_ARGS} ${DOCKER_IMG} bash -c 'make release && make firmware'
+	rm -rf output/*
+	docker run ${DOCKER_ARGS} ${DOCKER_IMG} bash -c 'make release && make lint && make firmware'
 
 release: clean
 	PASSWORD=${PASSWORD} SSID=${SSID} cargo build --release
+
+stats:
+	xtensa-esp32-elf-size -A target/xtensa-esp32s3-none-elf/release/firmware
+
+dram-usage:
+	cargo bloat --release --crates
+	cargo bloat --release --functions
 
 firmware:
 	mkdir -p output
@@ -60,10 +70,9 @@ erase:
 flash:
 	espflash flash ${ESPFLASH_ARGS} -B 921600
 
-flash-firmware: firmware
+flash-firmware:
 	espflash write-bin --chip esp32s3 0x8000 output/partitions.bin
 	espflash write-bin --chip esp32s3 0x10000 output/firmware.bin
-	espflash write-bin --chip esp32s3 0x510000 output/firmware.bin
 
 monitor:
 	espflash monitor

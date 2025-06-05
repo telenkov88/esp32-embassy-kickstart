@@ -2,9 +2,9 @@ let input = document.getElementsByTagName("input")[0];
 let output = document.getElementById("output");
 let button = document.getElementsByTagName("button")[0];
 
-let ssid =  document.getElementById('ssidInput')
-let psw =  document.getElementById('password')
-let hostname =  document.getElementById('hostName')
+let ssid = document.getElementById('ssidInput')
+let psw = document.getElementById('password')
+let hostname = document.getElementById('hostName')
 let uploadButton = document.getElementById("uploadDataBtn")
 
 // Regex for a “valid” SSID - 1–32 printable characters:
@@ -22,6 +22,7 @@ ssid.addEventListener("input", validateInputs);
 psw.addEventListener("input", validateInputs);
 hostname.addEventListener("input", validateInputs);
 validateInputs();
+
 function checkPattern(inputElement, pattern) {
     const value = inputElement.value.trim();
     return pattern.test(value);
@@ -44,7 +45,7 @@ uploadButton.addEventListener("click", function () {
         "psw": document.getElementById('password').value,
         "hostname": document.getElementById('hostName').value,
     };
-    if (!validateInputs()){
+    if (!validateInputs()) {
         console.log("Settings invalid", data)
         return
     }

@@ -1,13 +1,13 @@
+use crate::neopixel::NeoPixel;
+use crate::{FIRMWARE_UPGRADE_IN_PROGRESS, WIFI_INITIALIZED, WIFI_MODE_CLIENT, try_log};
 use core::sync::atomic::Ordering;
 use embassy_executor::task;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
-use esp_hal::{rmt::Rmt};
-use esp_hal::gpio::{GpioPin};
-use esp_println::println;
+use esp_hal::gpio::GpioPin;
+use esp_hal::rmt::Rmt;
 use esp_hal::system::Cpu;
 use esp_hal_smartled::smartLedBuffer;
-use crate::neopixel::NeoPixel;
-use crate::{FIRMWARE_UPGRADE_IN_PROGRESS, WIFI_INITIALIZED, WIFI_MODE_CLIENT};
+use log::{error, info};
 
 const GPIONUM: u8 = 48;
 
@@ -17,34 +17,52 @@ pub async fn control_led(
     rmt: Rmt<'static, esp_hal::Blocking>,
     control: &'static Signal<CriticalSectionRawMutex, bool>,
 ) {
-    println!("Starting control_led() on core {}", Cpu::current() as usize);
+    info!("Starting control_led() on core {}", Cpu::current() as usize);
+
     let rmt_buffer = smartLedBuffer!(1);
     let channel = rmt.channel0;
     let mut smart_led = NeoPixel::new(channel, led, rmt_buffer);
-    
-    smart_led.set_brightness(0).unwrap();
-    let mut brightness: u8 = 0;
-    let mut r:u8 = 0;
-    let mut g:u8 = 0;
-    let mut b:u8 = 0;
-    smart_led.set_hue(0).unwrap();
-    smart_led.set_rgb(r,g,b, brightness).unwrap();
+
+    // Initial LED state -------------------------------------------------------
+    try_log!(smart_led.set_brightness(0), "set_brightness(0)");
+    try_log!(smart_led.set_hue(0), "set_hue(0)");
+    try_log!(smart_led.set_rgb(0, 0, 0, 0), "set_rgb init");
+
+    // Working buffers ---------------------------------------------------------
+    let mut brightness: u8;
+    let mut r: u8;
+    let mut g: u8;
+    let mut b: u8;
+
+    // Main loop ---------------------------------------------------------------
     loop {
-        if control.wait().await {
-            brightness = 2;
-        } else {
-            brightness = 1;
-        }
-        if FIRMWARE_UPGRADE_IN_PROGRESS.load(Ordering::Acquire) {
-            r = 255; g=140; b=0; // Firmware upgrade in progress. dark orange
-        } else if WIFI_INITIALIZED.load(Ordering::Acquire) && WIFI_MODE_CLIENT.load(Ordering::Acquire) {
-            r = 0; g=255; b=0; // Wi-fi online, Client mod. Green
-        } else if WIFI_INITIALIZED.load(Ordering::Acquire) && !WIFI_MODE_CLIENT.load(Ordering::Acquire) {
-            r = 0; g=0; b=255; // Wi-fi online, AP mod.     Blue
-        } else {
-            r=255; g=0; b=0;   // Wi-fi offline.            Red
+        // chosen by the button / external control
+        brightness = if control.wait().await { 2 } else { 1 };
+
+        // system-state → colour mapping
+        match (
+            FIRMWARE_UPGRADE_IN_PROGRESS.load(Ordering::Acquire),
+            WIFI_INITIALIZED.load(Ordering::Acquire),
+            WIFI_MODE_CLIENT.load(Ordering::Acquire),
+        ) {
+            (true, _, _) => {
+                // dark-orange : firmware upgrade
+                (r, g, b) = (255, 140, 0);
+            }
+            (false, true, true) => {
+                // green : Wi-Fi client connected
+                (r, g, b) = (0, 255, 0);
+            }
+            (false, true, false) => {
+                // blue : AP mode
+                (r, g, b) = (0, 0, 255);
+            }
+            _ => {
+                // red : Wi-Fi offline
+                (r, g, b) = (255, 0, 0);
+            }
         }
 
-        smart_led.set_rgb(r,g,b, brightness).unwrap()
+        try_log!(smart_led.set_rgb(r, g, b, brightness), "set_rgb loop");
     }
 }
