@@ -214,23 +214,68 @@ async fn wifi_connection(
             _ => {}
         }
 
-        if !matches!(controller.is_started(), Ok(true)) {
-            let config = match current_mode {
-                WifiMode::Sta => Configuration::Client(ClientConfiguration {
-                    ssid: ssid.clone().unwrap(),
-                    password: password.clone().unwrap(),
-                    ..Default::default()
-                }),
-                WifiMode::Ap => Configuration::AccessPoint(AccessPointConfiguration {
-                    ssid: "esp-wifi".try_into().unwrap(),
-                    ..Default::default()
-                }),
-            };
+        match controller.is_started() {
+            Ok(true) => {} // already started
+            Ok(false) => {
+                let config = match current_mode {
+                    WifiMode::Sta => {
+                        let ssid_val = match ssid.clone() {
+                            Some(v) => v,
+                            None => {
+                                error!("STA mode requested but SSID not provided");
+                                Timer::after(Duration::from_millis(5000)).await;
+                                continue;
+                            }
+                        };
+                        let password_val = match password.clone() {
+                            Some(v) => v,
+                            None => {
+                                error!("STA mode requested but password not provided");
+                                Timer::after(Duration::from_millis(5000)).await;
+                                continue;
+                            }
+                        };
 
-            controller.set_configuration(&config).unwrap();
-            info!("Starting wifi");
-            controller.start_async().await.unwrap();
-            info!("Wifi started!");
+                        Configuration::Client(ClientConfiguration {
+                            ssid: ssid_val,
+                            password: password_val,
+                            ..Default::default()
+                        })
+                    }
+                    WifiMode::Ap => {
+                        let ap_ssid: String<32> = match "esp-wifi".try_into() {
+                            Ok(s) => s,
+                            Err(_) => {
+                                error!("Failed to create AP SSID string");
+                                Timer::after(Duration::from_millis(5000)).await;
+                                continue;
+                            }
+                        };
+                        Configuration::AccessPoint(AccessPointConfiguration {
+                            ssid: ap_ssid,
+                            ..Default::default()
+                        })
+                    }
+                };
+
+                if let Err(e) = controller.set_configuration(&config) {
+                    error!("set_configuration error: {e:?}");
+                    Timer::after(Duration::from_millis(5000)).await;
+                    continue;
+                }
+                info!("Starting wifi");
+                if let Err(e) = controller.start_async().await {
+                    error!("start_async error: {e:?}");
+                    Timer::after(Duration::from_millis(5000)).await;
+                    continue;
+                }
+                info!("Wifi started!");
+            }
+            Err(e) => {
+                error!("is_started() failed: {e:?}");
+                Timer::after(Duration::from_millis(5000)).await;
+                continue;
+            }
         }
 
         if let WifiMode::Sta = current_mode {
@@ -238,7 +283,7 @@ async fn wifi_connection(
             match controller.connect_async().await {
                 Ok(_) => info!("Wifi connected!"),
                 Err(e) => {
-                    info!("Failed to connect to wifi: {e:?}");
+                    error!("Failed to connect to wifi: {e:?}");
                     Timer::after(Duration::from_millis(5000)).await;
                 }
             }
