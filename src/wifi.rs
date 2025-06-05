@@ -53,7 +53,13 @@ async fn run_dhcp(stack: Stack<'static>, gw_ip_addr: &'static str) {
     use edge_nal::UdpBind;
     use edge_nal_embassy::{Udp, UdpBuffers};
 
-    let ip = Ipv4Addr::from_str(gw_ip_addr).expect("dhcp task failed to parse gw ip");
+    let ip = match Ipv4Addr::from_str(gw_ip_addr) {
+        Ok(ip) => ip,
+        Err(e) => {
+            error!("DHCP server: invalid gateway IP address '{gw_ip_addr}': {e}");
+            return;
+        }
+    };
 
     let mut buf = [0u8; 1500];
 
@@ -61,23 +67,31 @@ async fn run_dhcp(stack: Stack<'static>, gw_ip_addr: &'static str) {
 
     let buffers = UdpBuffers::<3, 1024, 1024, 10>::new();
     let unbound_socket = Udp::new(stack, &buffers);
-    let mut bound_socket = unbound_socket
+    let mut bound_socket = match unbound_socket
         .bind(core::net::SocketAddr::V4(SocketAddrV4::new(
             Ipv4Addr::UNSPECIFIED,
             DEFAULT_SERVER_PORT,
         )))
         .await
-        .unwrap();
+    {
+        Ok(sock) => sock,
+        Err(e) => {
+            error!("DHCP server: failed to bind socket: {e:?}");
+            return;
+        }
+    };
 
     loop {
-        _ = io::server::run(
+        if let Err(e) = io::server::run(
             &mut Server::<_, 64>::new_with_et(ip),
             &ServerOptions::new(ip, Some(&mut gw_buf)),
             &mut bound_socket,
             &mut buf,
         )
-        .await
-        .inspect_err(|e| error!("DHCP server error: {e:?}"));
+            .await
+        {
+            error!("DHCP server error: {e:?}");
+        }
         Timer::after(Duration::from_millis(500)).await;
     }
 }
