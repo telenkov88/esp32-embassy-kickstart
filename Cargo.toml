@@ -1,14 +1,14 @@
 [package]
-edition = "2021"
-name    = "dual-core"
-version = "0.1.0"
+edition = "2024"
+name    = "esp32-embassy-kickstart"
+version = "0.2.0"
 resolver = "2"
 
 [package.metadata.espflash]
 partition_table = "partitions.csv"
 
 [[bin]]
-name = "dual-core"
+name = "firmware"
 path = "./src/main.rs"
 test = false
 doctest = false

@@ -240,40 +240,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dual-core"
-version = "0.1.0"
-dependencies = [
- "edge-dhcp",
- "edge-nal",
- "edge-nal-embassy",
- "ekv",
- "embassy-embedded-hal",
- "embassy-executor",
- "embassy-futures",
- "embassy-net",
- "embassy-sync",
- "embassy-time",
- "embedded-storage",
- "embedded-storage-async",
- "esp-alloc",
- "esp-backtrace",
- "esp-bootloader-esp-idf",
- "esp-hal",
- "esp-hal-embassy",
- "esp-hal-smartled",
- "esp-println",
- "esp-storage",
- "esp-wifi",
- "heapless",
- "log",
- "picoserve",
- "reqwless",
- "serde",
- "smart-leds",
- "static_cell",
-]
-
-[[package]]
 name = "edge-dhcp"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -846,6 +812,40 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6b5438361891c431970194a733415006fb3d00b6eb70b3dcb66fd58f04d9b39"
 dependencies = [
  "anyhow",
+]
+
+[[package]]
+name = "esp32-embassy-kickstart"
+version = "0.2.0"
+dependencies = [
+ "edge-dhcp",
+ "edge-nal",
+ "edge-nal-embassy",
+ "ekv",
+ "embassy-embedded-hal",
+ "embassy-executor",
+ "embassy-futures",
+ "embassy-net",
+ "embassy-sync",
+ "embassy-time",
+ "embedded-storage",
+ "embedded-storage-async",
+ "esp-alloc",
+ "esp-backtrace",
+ "esp-bootloader-esp-idf",
+ "esp-hal",
+ "esp-hal-embassy",
+ "esp-hal-smartled",
+ "esp-println",
+ "esp-storage",
+ "esp-wifi",
+ "heapless",
+ "log",
+ "picoserve",
+ "reqwless",
+ "serde",
+ "smart-leds",
+ "static_cell",
 ]
 
 [[package]]
