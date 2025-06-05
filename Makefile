@@ -39,7 +39,7 @@ docker:
 
 docker-build:
 	mkdir -p -m 777 output
-	rm -rf output/firmware.bin
+	rm -rf output/*
 	docker run ${DOCKER_ARGS} ${DOCKER_IMG} bash -c 'make release && make firmware'
 
 release: clean

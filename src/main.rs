@@ -61,6 +61,7 @@ use crate::db::DbFlash;
 use crate::wifi::WifiMode;
 use embassy_embedded_hal::adapter::BlockingAsync;
 use embassy_sync::mutex::Mutex;
+use esp_hal::clock::Clock;
 use heapless::String;
 
 const CONFIG_PARTITION_START: usize = 0xA10000;
@@ -120,6 +121,8 @@ async fn main(spawner: Spawner) {
     log_banner("Peripherals Init");
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+    info!("CPU {:>3} MHz", config.cpu_clock().mhz());
+    
 
     log_banner("OTA Init");
     {

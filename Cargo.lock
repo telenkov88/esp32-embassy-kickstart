@@ -611,13 +611,13 @@ dependencies = [
 
 [[package]]
 name = "esp-bootloader-esp-idf"
-version = "0.0.0"
-source = "git+https://github.com/esp-rs/esp-hal#f5287c3ef949818e30cf58558f6fb2ee37692c7a"
+version = "0.1.0"
+source = "git+https://github.com/esp-rs/esp-hal#d34aab3ecd8ddd1abcaa62c7cf295d7c22effefd"
 dependencies = [
  "chrono",
  "document-features",
  "embedded-storage",
- "esp-config 0.3.1 (git+https://github.com/esp-rs/esp-hal)",
+ "esp-config 0.4.0",
  "md-5",
  "strum 0.27.1",
 ]
@@ -644,8 +644,8 @@ dependencies = [
 
 [[package]]
 name = "esp-config"
-version = "0.3.1"
-source = "git+https://github.com/esp-rs/esp-hal#f5287c3ef949818e30cf58558f6fb2ee37692c7a"
+version = "0.4.0"
+source = "git+https://github.com/esp-rs/esp-hal#d34aab3ecd8ddd1abcaa62c7cf295d7c22effefd"
 dependencies = [
  "document-features",
  "serde",
@@ -679,7 +679,7 @@ dependencies = [
  "embedded-io-async",
  "enumset",
  "esp-build",
- "esp-config 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "esp-config 0.3.1",
  "esp-hal-procmacros",
  "esp-metadata",
  "esp-riscv-rt",
@@ -715,7 +715,7 @@ dependencies = [
  "embassy-time-driver",
  "embassy-time-queue-utils",
  "esp-build",
- "esp-config 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "esp-config 0.3.1",
  "esp-hal",
  "esp-hal-procmacros",
  "esp-metadata",
@@ -825,7 +825,7 @@ dependencies = [
  "enumset",
  "esp-alloc",
  "esp-build",
- "esp-config 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "esp-config 0.3.1",
  "esp-hal",
  "esp-metadata",
  "esp-wifi-sys",
