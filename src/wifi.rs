@@ -119,7 +119,7 @@ pub async fn init_wifi(
             embassy_net::Config::dhcpv4(Default::default()),
         ),
         WifiMode::Ap => {
-            let gw_ip_addr = Ipv4Addr::from_str("192.168.1.1").unwrap();
+            let gw_ip_addr = Ipv4Addr::new(192, 168, 1, 1);
             (
                 interfaces.ap,
                 embassy_net::Config::ipv4_static(StaticConfigV4 {
@@ -141,26 +141,30 @@ pub async fn init_wifi(
         WifiMode::Sta => {
             info!("Connect Sta Mode");
             WIFI_MODE_CLIENT.store(true, Ordering::Release);
-            spawner
-                .spawn(wifi_connection(
-                    controller,
-                    mode,
-                    Some(ssid),
-                    Some(password),
-                ))
-                .ok();
+            if let Err(e) = spawner.spawn(wifi_connection(
+                controller,
+                mode,
+                Some(ssid),
+                Some(password),
+            )) {
+                error!("Failed to spawn wifi_connection: {e:?}");
+            }
         }
         WifiMode::Ap => {
             info!("Connect AP Mode");
             WIFI_MODE_CLIENT.store(false, Ordering::Release);
-            spawner
-                .spawn(wifi_connection(controller, mode, None, None))
-                .ok();
-            spawner.spawn(run_dhcp(*stack, "192.168.1.1")).ok();
+            if let Err(e) = spawner.spawn(wifi_connection(controller, mode, None, None)) {
+                error!("Failed to spawn wifi_connection: {e:?}");
+            }
+            if let Err(e) = spawner.spawn(run_dhcp(*stack, "192.168.1.1")) {
+                error!("Failed to spawn DHCP task: {e:?}");
+            }
         }
     }
 
-    spawner.spawn(net_task(runner)).ok();
+    if let Err(e) = spawner.spawn(net_task(runner)) {
+        error!("Failed to spawn net task: {e:?}");
+    }
 
     loop {
         if stack.is_link_up() {
