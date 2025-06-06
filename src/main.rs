@@ -61,6 +61,7 @@ use crate::db::DbFlash;
 use crate::wifi::WifiMode;
 use embassy_embedded_hal::adapter::BlockingAsync;
 use esp_hal::clock::Clock;
+use esp_hal::system::AppCoreGuard;
 use heapless::String;
 
 const CONFIG_PARTITION_START: usize = 0xA10000;
@@ -204,19 +205,31 @@ async fn main(spawner: Spawner) {
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
     log_banner("Led Worker Init");
-    if let Err(e) =
-        cpu_control.start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {
+    let worker_guard =
+        match cpu_control.start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {
             static EXECUTOR: StaticCell<Executor> = StaticCell::new();
             let executor = EXECUTOR.init(Executor::new());
+
             executor.run(|spawner| {
-                try_log!(
-                    spawner.spawn(control_led(led_pin, rmt, led_ctrl_signal)),
-                    "spawn(control_led)"
-                );
+                match spawner.spawn(control_led(led_pin, rmt, led_ctrl_signal)) {
+                    Ok(_) => info!("Worker task spawned successfully"),
+                    Err(e) => error!("Failed to spawn worker task: {:?}", e),
+                }
             });
-        })
-    {
-        error!("Failed to start app core: {:?}", e);
+        }) {
+            Ok(guard) => {
+                info!("Core started successfully");
+                guard
+            }
+            Err(e) => {
+                error!("Failed to start core: {:?}", e);
+                return;
+            }
+        };
+
+    static mut WORKER_GUARD: Option<AppCoreGuard> = None; // Store the AppCoreGuard to keep the core alive
+    unsafe {
+        WORKER_GUARD = Some(worker_guard);
     }
 
     log_banner("Led Control Init");
