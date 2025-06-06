@@ -1,7 +1,7 @@
 use heapless::String;
 
 use crate::DbMutex;
-use crate::config::{WifiSettings, update_wifi_settings};
+use crate::wifi_config::{WifiSettings, update_wifi_settings};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::watch::Watch;
 use embassy_time::{Duration, Timer};

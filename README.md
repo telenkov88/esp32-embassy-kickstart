@@ -4,23 +4,23 @@ A minimal async‑Rust starter project for the **ESP32‑S3** built on top of [E
 
 ## Features
 
-1. **Runtime Wi‑Fi configuration (AP ⇄ STA)**
-   * If no credentials are compiled in, the board boots as an **Access Point** named \`esp-wifi\` at **192.168.1.1**.
+1. **Runtime Wi‑Fi configuration (AP <-> STA)**
+   * If no credentials are compiled in, the board boots as an **Access Point** named \`esp-wifi\` at **192.168.1.1**.
    * Connect to that network and open `http://192.168.1.1` in a browser to enter your home **SSID** and **password**.
    * After reboot the device starts in **Station** mode and automatically reconnects on subsequent boots.
-2. **Async Web server** with Server‑Sent Events (SSE) and a simple WebSocket echo endpoint.
+2. **Async Web server** with Server‑Sent Events (SSE) and a simple WebSocket echo endpoint.
 3. **Async HTTP client** for outbound REST/OTA download requests.
 4. **Dual‑core execution** using two Embassy executors with lock‑free channels for inter‑core messaging.
 5. **On‑board NeoPixel (WS2812) driver** for status LEDs and custom effects.
 6. **EKV key‑value storage** for persisting configuration and runtime state across reboots.
 7. **Over‑the‑air (OTA) firmware update** via HTTP with a fallback slot for safe roll‑backs.
 
-## Quick Start
+## Quick Start
 
 ### Prerequisites
 
 * Rust stable with the nightly **esp32s3-unknown-none-elf** target installed
-* ESP‑IDF v5.x prerequisites (`idf.py`, tool‑chain in PATH)
+* ESP‑IDF v5.x prerequisites (`idf.py`, tool‑chain in PATH)
 * `make`, [`cargo-make`](https://github.com/sagiegurari/cargo-make) and **Docker** (optional)
 
 ### Build
@@ -31,13 +31,22 @@ source "$HOME/export-esp.sh"
 make build           # produces build/esp32s3/firmware.bin
 ```
 
-### Flash & Monitor
+### Flash & Monitor
 
 Set your Wi‑Fi credentials in the environment (optional):
 
 ```bash
 export SSID="MyWiFi"
 export PASSWORD="SuperSecret"
+```
+
+Set your MQTT credentials in the environment (optional):
+
+```bash
+export MQTT_BROKER="tcp://localhost:1883"
+export MQTT_CLIENT_ID="esp32-client"
+export MQTT_USERNAME="guest"
+export MQTT_USERNAME="guest"
 ```
 
 Then flash and open the serial monitor:

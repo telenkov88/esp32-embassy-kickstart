@@ -1,6 +1,15 @@
 PASSWORD?='MyDefaultPsw'
 SSID?='MyDefaultSSID'
 
+MQTT_BROKER?='tcp://localhost:1883'
+MQTT_CLIENT_ID?='esp32-client'
+MQTT_USERNAME?='guest'
+MQTT_PASSWORD?='guest'
+
+PASS_ENV_VARS = PASSWORD=${PASSWORD} SSID=${SSID} \
+				MQTT_BROKER=${MQTT_BROKER} MQTT_CLIENT_ID=${MQTT_CLIENT_ID} \
+				MQTT_USERNAME=${MQTT_USERNAME} MQTT_PASSWORD=${MQTT_PASSWORD}
+
 DOCKER_IMG = ghcr.io/telenkov88/idf-rust-esp32:latest
 
 
@@ -32,7 +41,7 @@ clean:
 	rm -rf output/firmware.bin
 
 build:
-	PASSWORD=${PASSWORD} SSID=${SSID} cargo build
+	${PASS_ENV_VARS} cargo build
 
 lint:
 	cargo clippy --workspace --release
@@ -46,7 +55,7 @@ docker-build:
 	docker run ${DOCKER_ARGS} ${DOCKER_IMG} bash -c 'make release && make lint && make firmware'
 
 release: clean
-	PASSWORD=${PASSWORD} SSID=${SSID} cargo build --release
+	${PASS_ENV_VARS} cargo build --release
 
 stats:
 	xtensa-esp32-elf-size -A target/xtensa-esp32s3-none-elf/release/firmware
@@ -78,4 +87,4 @@ monitor:
 	espflash monitor
 
 run:
-	PASSWORD=${PASSWORD} SSID=${SSID} cargo run
+	${PASS_ENV_VARS} cargo run

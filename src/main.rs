@@ -53,12 +53,15 @@ mod config;
 mod db;
 mod log_utils;
 mod macros;
+mod mqtt_config;
+mod wifi_config;
 
 use log_utils::log_banner;
 
-use crate::config::{get_default_credentials, get_wifi_credentials};
 use crate::db::DbFlash;
+use crate::mqtt_config::{get_default_mqtt_credentials, get_mqtt_credentials};
 use crate::wifi::WifiMode;
+use crate::wifi_config::{get_default_wifi_credentials, get_wifi_credentials};
 use embassy_embedded_hal::adapter::BlockingAsync;
 use esp_hal::clock::Clock;
 use esp_hal::system::AppCoreGuard;
@@ -74,19 +77,6 @@ pub static WIFI_INITIALIZED: AtomicBool = AtomicBool::new(false);
 pub static WIFI_MODE_CLIENT: AtomicBool = AtomicBool::new(false);
 pub static TIME_SYNCED: AtomicBool = AtomicBool::new(false);
 pub static FIRMWARE_UPGRADE_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
-
-const fn or_str(opt: Option<&'static str>, default: &'static str) -> &'static str {
-    if let Some(val) = opt {
-        val
-    } else if opt.is_none() {
-        default
-    } else {
-        unreachable!()
-    }
-}
-
-const SSID: &str = or_str(option_env!("SSID"), "MyDefaultSSID");
-const PASSWORD: &str = or_str(option_env!("PASSWORD"), "MyDefaultPassword");
 
 #[task(pool_size = 2)]
 pub async fn http_wk(
@@ -245,7 +235,7 @@ async fn main(spawner: Spawner) {
             info!("mDNS name {}.local", creds.hostname);
             (creds.ssid, creds.password, WifiMode::Sta)
         }
-        Err(_) => match get_default_credentials() {
+        Err(_) => match get_default_wifi_credentials() {
             Ok(default_creds)
                 if !default_creds.ssid.is_empty() && default_creds.ssid != "MyDefaultSSID" =>
             {
@@ -326,6 +316,45 @@ async fn main(spawner: Spawner) {
     } else {
         error!("Failed to parse initial SSE message");
     }
+
+    log_banner("Mqtt Init");
+    let (broker_uri, client_id, username, password) = match get_mqtt_credentials(kv_mutex).await {
+        Ok(mqtt) => {
+            info!("Using stored MQTT credentials");
+            info!("MQTT Broker URI {}", mqtt.broker_uri);
+            info!("MQTT Client ID {}", mqtt.client_id);
+            info!("MQTT Client USERNAME {}", mqtt.username);
+            info!("MQTT Client PASSWORD {}", mqtt.password);
+            (
+                mqtt.broker_uri,
+                mqtt.client_id,
+                mqtt.username,
+                mqtt.password,
+            )
+        }
+        Err(_) => match get_default_mqtt_credentials() {
+            Ok(default_mqtt_creds)
+                if !default_mqtt_creds.broker_uri.is_empty()
+                    && default_mqtt_creds.broker_uri != "tcp://localhost:1883" =>
+            {
+                info!("Using compile-time MQTT credentials");
+                info!("MQTT Broker URI {}", default_mqtt_creds.broker_uri);
+                info!("MQTT Client ID {}", default_mqtt_creds.client_id);
+                info!("MQTT Client USERNAME {}", default_mqtt_creds.username);
+                info!("MQTT Client PASSWORD {}", default_mqtt_creds.password);
+                (
+                    default_mqtt_creds.broker_uri,
+                    default_mqtt_creds.client_id,
+                    default_mqtt_creds.username,
+                    default_mqtt_creds.password,
+                )
+            }
+            _ => {
+                info!("No valid MQTT credentials, skipping");
+                (String::new(), String::new(), String::new(), String::new())
+            }
+        },
+    };
 
     log_banner("All Init finished");
     loop {
