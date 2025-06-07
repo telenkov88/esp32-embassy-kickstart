@@ -318,35 +318,36 @@ async fn main(spawner: Spawner) {
     }
 
     log_banner("Mqtt Init");
-    let (mqtt_broker_uri, mqtt_client_id, mqtt_username, mqtt_password) = match get_mqtt_credentials(kv_mutex).await {
-        Ok(mqtt) => {
-            info!("Using stored MQTT credentials");
-            (
-                mqtt.broker_uri,
-                mqtt.client_id,
-                mqtt.username,
-                mqtt.password,
-            )
-        }
-        Err(_) => match get_default_mqtt_credentials() {
-            Ok(default_mqtt_creds)
-                if !default_mqtt_creds.broker_uri.is_empty()
-                    && default_mqtt_creds.broker_uri != "tcp://localhost:1883" =>
-            {
-                info!("Using compile-time MQTT credentials");
+    let (mqtt_broker_uri, mqtt_client_id, mqtt_username, mqtt_password) =
+        match get_mqtt_credentials(kv_mutex).await {
+            Ok(mqtt) => {
+                info!("Using stored MQTT credentials");
                 (
-                    default_mqtt_creds.broker_uri,
-                    default_mqtt_creds.client_id,
-                    default_mqtt_creds.username,
-                    default_mqtt_creds.password,
+                    mqtt.broker_uri,
+                    mqtt.client_id,
+                    mqtt.username,
+                    mqtt.password,
                 )
             }
-            _ => {
-                info!("No valid MQTT credentials, skipping");
-                (String::new(), String::new(), String::new(), String::new())
-            }
-        },
-    };
+            Err(_) => match get_default_mqtt_credentials() {
+                Ok(default_mqtt_creds)
+                    if !default_mqtt_creds.broker_uri.is_empty()
+                        && default_mqtt_creds.broker_uri != "tcp://localhost:1883" =>
+                {
+                    info!("Using compile-time MQTT credentials");
+                    (
+                        default_mqtt_creds.broker_uri,
+                        default_mqtt_creds.client_id,
+                        default_mqtt_creds.username,
+                        default_mqtt_creds.password,
+                    )
+                }
+                _ => {
+                    info!("No valid MQTT credentials, skipping");
+                    (String::new(), String::new(), String::new(), String::new())
+                }
+            },
+        };
     info!("MQTT Broker URI {}", mqtt_broker_uri);
     info!("MQTT Client ID {}", mqtt_client_id);
     info!("MQTT Client USERNAME {}", mqtt_username);

@@ -6,12 +6,12 @@ use smart_leds::hsv::hsv2rgb;
 use smart_leds::{SmartLedsWrite, brightness, gamma, hsv::Hsv};
 
 pub trait NeoPixelChannelCreator<'d, ChannelType: TxChannel, Pin: OutputPin>:
-TxChannelCreator<'d, ChannelType>
+    TxChannelCreator<'d, ChannelType>
 {
 }
 
 impl<'d, ChannelCreator, ChannelType, Pin> NeoPixelChannelCreator<'d, ChannelType, Pin>
-for ChannelCreator
+    for ChannelCreator
 where
     ChannelCreator: TxChannelCreator<'d, ChannelType>,
     ChannelType: TxChannel,

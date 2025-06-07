@@ -236,9 +236,27 @@ async fn wifi_connection(
                             }
                         };
 
+                        let ssid_str = match core::str::from_utf8(ssid_val.as_bytes()) {
+                            Ok(s) => s,
+                            Err(e) => {
+                                error!("Invalid UTF-8 in SSID: {}", e);
+                                Timer::after(Duration::from_millis(5000)).await;
+                                continue;
+                            }
+                        };
+
+                        let password_str = match core::str::from_utf8(password_val.as_bytes()) {
+                            Ok(s) => s,
+                            Err(e) => {
+                                error!("Invalid UTF-8 in password: {}", e);
+                                Timer::after(Duration::from_millis(5000)).await;
+                                continue;
+                            }
+                        };
+
                         Configuration::Client(ClientConfiguration {
-                            ssid: ssid_val.parse().unwrap(),
-                            password: password_val.parse().unwrap(),
+                            ssid: ssid_str.into(),
+                            password: password_str.into(),
                             ..Default::default()
                         })
                     }
@@ -251,8 +269,18 @@ async fn wifi_connection(
                                 continue;
                             }
                         };
+
+                        let ssid_str = match core::str::from_utf8(ap_ssid.as_bytes()) {
+                            Ok(s) => s,
+                            Err(e) => {
+                                error!("Invalid UTF-8 in AP SSID: {}", e);
+                                Timer::after(Duration::from_millis(5000)).await;
+                                continue;
+                            }
+                        };
+
                         Configuration::AccessPoint(AccessPointConfiguration {
-                            ssid: ap_ssid.parse().unwrap(),
+                            ssid: ssid_str.into(),
                             ..Default::default()
                         })
                     }

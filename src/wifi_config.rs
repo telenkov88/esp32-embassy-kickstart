@@ -1,6 +1,6 @@
+use crate::DbMutex;
 use crate::config::{DbError, read_setting, write_db};
 use crate::shared::or_str;
-use crate::{DbMutex};
 use core::fmt;
 use heapless::String;
 use log::{error, info};

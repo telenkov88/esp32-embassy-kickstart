@@ -3,12 +3,11 @@ use crate::{FIRMWARE_UPGRADE_IN_PROGRESS, WIFI_INITIALIZED, WIFI_MODE_CLIENT, tr
 use core::sync::atomic::Ordering;
 use embassy_executor::task;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
-use esp_hal::peripherals::{GPIO48};
+use esp_hal::peripherals::GPIO48;
 use esp_hal::rmt::Rmt;
 use esp_hal::system::Cpu;
 use esp_hal_smartled::smart_led_buffer;
 use log::{error, info};
-
 
 #[task]
 pub async fn control_led(
