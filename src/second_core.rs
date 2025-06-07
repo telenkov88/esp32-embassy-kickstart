@@ -3,23 +3,22 @@ use crate::{FIRMWARE_UPGRADE_IN_PROGRESS, WIFI_INITIALIZED, WIFI_MODE_CLIENT, tr
 use core::sync::atomic::Ordering;
 use embassy_executor::task;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
-use esp_hal::gpio::GpioPin;
+use esp_hal::peripherals::{GPIO48};
 use esp_hal::rmt::Rmt;
 use esp_hal::system::Cpu;
-use esp_hal_smartled::smartLedBuffer;
+use esp_hal_smartled::smart_led_buffer;
 use log::{error, info};
 
-const GPIONUM: u8 = 48;
 
 #[task]
 pub async fn control_led(
-    led: GpioPin<GPIONUM>,
+    led: GPIO48<'static>,
     rmt: Rmt<'static, esp_hal::Blocking>,
     control: &'static Signal<CriticalSectionRawMutex, bool>,
 ) {
     info!("Starting control_led() on core {}", Cpu::current() as usize);
 
-    let rmt_buffer = smartLedBuffer!(1);
+    let rmt_buffer = smart_led_buffer!(1);
     let channel = rmt.channel0;
     let mut smart_led = NeoPixel::new(channel, led, rmt_buffer);
 

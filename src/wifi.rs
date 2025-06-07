@@ -98,10 +98,10 @@ async fn run_dhcp(stack: Stack<'static>, gw_ip_addr: &'static str) {
 #[allow(clippy::too_many_arguments)]
 pub async fn init_wifi(
     spawner: Spawner,
-    timer_g0: TimerGroup<TIMG0>,
+    timer_g0: TimerGroup<'static, TIMG0<'static>>,
     mut rng: Rng,
-    wifi: WIFI,
-    radio_clock_control: RADIO_CLK,
+    wifi: WIFI<'static>,
+    radio_clock_control: RADIO_CLK<'static>,
     ssid: String<32>,
     password: String<64>,
     mode: WifiMode,
@@ -237,8 +237,8 @@ async fn wifi_connection(
                         };
 
                         Configuration::Client(ClientConfiguration {
-                            ssid: ssid_val,
-                            password: password_val,
+                            ssid: ssid_val.parse().unwrap(),
+                            password: password_val.parse().unwrap(),
                             ..Default::default()
                         })
                     }
@@ -252,7 +252,7 @@ async fn wifi_connection(
                             }
                         };
                         Configuration::AccessPoint(AccessPointConfiguration {
-                            ssid: ap_ssid,
+                            ssid: ap_ssid.parse().unwrap(),
                             ..Default::default()
                         })
                     }

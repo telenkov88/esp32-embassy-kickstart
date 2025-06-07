@@ -1,5 +1,4 @@
 use esp_hal::gpio::OutputPin;
-use esp_hal::peripheral::Peripheral;
 use esp_hal::rmt::{TxChannel, TxChannelCreator};
 use esp_hal_smartled::SmartLedsAdapter;
 use smart_leds::RGB8;
@@ -7,14 +6,14 @@ use smart_leds::hsv::hsv2rgb;
 use smart_leds::{SmartLedsWrite, brightness, gamma, hsv::Hsv};
 
 pub trait NeoPixelChannelCreator<'d, ChannelType: TxChannel, Pin: OutputPin>:
-    TxChannelCreator<'d, ChannelType, Pin>
+TxChannelCreator<'d, ChannelType>
 {
 }
 
 impl<'d, ChannelCreator, ChannelType, Pin> NeoPixelChannelCreator<'d, ChannelType, Pin>
-    for ChannelCreator
+for ChannelCreator
 where
-    ChannelCreator: TxChannelCreator<'d, ChannelType, Pin>,
+    ChannelCreator: TxChannelCreator<'d, ChannelType>,
     ChannelType: TxChannel,
     Pin: OutputPin,
 {
@@ -29,12 +28,12 @@ pub struct NeoPixel<ChannelType: TxChannel, const BUFFER_SIZE: usize> {
 impl<ChannelType: TxChannel, const BUFFER_SIZE: usize> NeoPixel<ChannelType, BUFFER_SIZE> {
     pub fn new<'d, ChannelCreator, Pin>(
         channel: ChannelCreator,
-        pin: impl Peripheral<P = Pin> + 'd,
+        pin: Pin,
         rmt_buffer: [u32; BUFFER_SIZE],
     ) -> Self
     where
         ChannelCreator: NeoPixelChannelCreator<'d, ChannelType, Pin>,
-        Pin: OutputPin,
+        Pin: OutputPin + 'd,
     {
         let led = SmartLedsAdapter::new(channel, pin, rmt_buffer);
 
