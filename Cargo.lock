@@ -793,13 +793,15 @@ dependencies = [
 
 [[package]]
 name = "esp-storage"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e98b5069bd1482fb85f9236f8ea6cd1b5b6b5a1c3c3fb8c938c97ccfbbb051b"
+checksum = "5b6502654e5750e8162e66512d7e8d84f7eb51d17ec6aa7e0da95cd102769425"
 dependencies = [
  "critical-section",
+ "document-features",
  "embedded-storage",
- "esp-build 0.2.0",
+ "esp-build 0.3.0",
+ "esp-metadata 0.7.0",
 ]
 
 [[package]]
