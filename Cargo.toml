@@ -26,7 +26,7 @@ embassy-net = { version = "0.7.0", features = [
 ] }
 
 esp-alloc = "0.8.0"
-esp-hal = { version = "1.0.0-beta.0", features = ["esp32s3", "unstable"] }
+esp-hal = { version = "1.0.0-beta.1", features = ["esp32s3", "unstable"] }
 
 embassy-executor = { version = "0.7.0", features = ["nightly"] }
 embassy-time = { version = "0.4.0", features = ["generic-queue-8"] }
