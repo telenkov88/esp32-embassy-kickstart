@@ -318,13 +318,9 @@ async fn main(spawner: Spawner) {
     }
 
     log_banner("Mqtt Init");
-    let (broker_uri, client_id, username, password) = match get_mqtt_credentials(kv_mutex).await {
+    let (mqtt_broker_uri, mqtt_client_id, mqtt_username, mqtt_password) = match get_mqtt_credentials(kv_mutex).await {
         Ok(mqtt) => {
             info!("Using stored MQTT credentials");
-            info!("MQTT Broker URI {}", mqtt.broker_uri);
-            info!("MQTT Client ID {}", mqtt.client_id);
-            info!("MQTT Client USERNAME {}", mqtt.username);
-            info!("MQTT Client PASSWORD {}", mqtt.password);
             (
                 mqtt.broker_uri,
                 mqtt.client_id,
@@ -338,10 +334,6 @@ async fn main(spawner: Spawner) {
                     && default_mqtt_creds.broker_uri != "tcp://localhost:1883" =>
             {
                 info!("Using compile-time MQTT credentials");
-                info!("MQTT Broker URI {}", default_mqtt_creds.broker_uri);
-                info!("MQTT Client ID {}", default_mqtt_creds.client_id);
-                info!("MQTT Client USERNAME {}", default_mqtt_creds.username);
-                info!("MQTT Client PASSWORD {}", default_mqtt_creds.password);
                 (
                     default_mqtt_creds.broker_uri,
                     default_mqtt_creds.client_id,
@@ -355,6 +347,10 @@ async fn main(spawner: Spawner) {
             }
         },
     };
+    info!("MQTT Broker URI {}", mqtt_broker_uri);
+    info!("MQTT Client ID {}", mqtt_client_id);
+    info!("MQTT Client USERNAME {}", mqtt_username);
+    info!("MQTT Client PASSWORD {}", mqtt_password);
 
     log_banner("All Init finished");
     loop {

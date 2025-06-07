@@ -1,11 +1,9 @@
-use crate::shared::or_str;
 use crate::{DbMutex, KvDatabase};
 use core::fmt;
 use ekv::{CommitError, ReadError, WriteError};
 use esp_storage::FlashStorageError;
 use heapless::String;
-use log::{error, info};
-use serde::{Deserialize, Serialize};
+use log::{error};
 
 pub async fn read_setting<const N: usize>(
     db_mutex: &'static DbMutex,

@@ -1,9 +1,7 @@
 use crate::config::{DbError, read_setting, write_db};
 use crate::shared::or_str;
-use crate::{DbMutex, KvDatabase};
+use crate::{DbMutex};
 use core::fmt;
-use ekv::{CommitError, ReadError, WriteError};
-use esp_storage::FlashStorageError;
 use heapless::String;
 use log::{error, info};
 use serde::{Deserialize, Serialize};

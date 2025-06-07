@@ -1,12 +1,8 @@
 use crate::config::{DbError, read_setting, write_db};
 use crate::shared::or_str;
-use crate::{DbMutex, KvDatabase};
-use core::fmt;
-use ekv::{CommitError, ReadError, WriteError};
-use esp_storage::FlashStorageError;
+use crate::{DbMutex};
 use heapless::String;
 use log::{error, info};
-use serde::{Deserialize, Serialize};
 
 const MQTT_BROKER_KEY: &[u8] = b"mqtt.broker";
 const MQTT_CLIENT_ID_KEY: &[u8] = b"mqtt.client_id";
@@ -34,6 +30,7 @@ pub enum MqttCredTooLongError {
     Password,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum MqttSettingsError {
     Storage(DbError),
@@ -99,6 +96,7 @@ pub async fn get_mqtt_credentials(
     }
 }
 
+#[allow(dead_code)]
 pub async fn update_mqtt_credentials(
     creds: &MqttCredentials,
     db_mutex: &'static DbMutex,
