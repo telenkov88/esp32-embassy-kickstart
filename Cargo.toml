@@ -44,9 +44,9 @@ edge-nal = {version = "0.5.0"}
 edge-nal-embassy = {version = "0.6.0", features = ["proto-ipv4", "udp"], default-features = false}
 heapless = { version = "0.8.0", default-features = false }
 static_cell = { version = "2.1.0", features = ["nightly"] }
-esp-println = {version = "0.13.1", features = ["esp32s3", "log"]}
+esp-println = {version = "0.14.0", features = ["esp32s3", "log-04"]}
 log = { version = "0.4.27" }
-esp-backtrace = {version = "0.15.1", features = ["esp32s3", "exception-handler", "panic-handler", "println"]}
+esp-backtrace = {version = "0.16.0", features = ["esp32s3", "exception-handler", "panic-handler", "println"]}
 
 picoserve = { version = "0.16.0", features = ["embassy"] }
 serde = { version = "1.0.219", features = ["derive"], default-features = false }
